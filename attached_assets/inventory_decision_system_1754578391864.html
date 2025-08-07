@@ -1,0 +1,892 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Smart Inventory & Order Decision System</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{--bg:#ffffff;--text:#111;--muted:#666;--accent:#0a7;--border:#ddd;--table-stripe:#fafafa;--success:#28a745;--warning:#ffc107;--danger:#dc3545;--info:#17a2b8;}
+  *{box-sizing:border-box}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:var(--bg);color:var(--text);line-height:1.5}
+  
+  .container{max-width:1400px;margin:0 auto;padding:20px}
+  .header{text-align:center;margin-bottom:30px;padding:20px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;border-radius:12px}
+  .header h1{margin:0;font-size:28px}
+  .header p{margin:8px 0 0;opacity:0.9}
+  
+  .dashboard{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:30px}
+  @media (max-width: 768px){.dashboard{grid-template-columns:1fr}}
+  
+  .card{background:white;border-radius:12px;padding:24px;margin-bottom:20px;box-shadow:0 4px 6px rgba(0,0,0,0.07);border:1px solid var(--border)}
+  .card h2{margin:0 0 20px;color:var(--accent);font-size:20px;display:flex;align-items:center;gap:8px}
+  .card h3{margin:0 0 16px;font-size:16px;color:var(--text)}
+  
+  .status-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:20px}
+  .status-card{padding:20px;border-radius:12px;text-align:center;color:white}
+  .status-card.good{background:linear-gradient(135deg,#28a745,#20c997)}
+  .status-card.warning{background:linear-gradient(135deg,#ffc107,#fd7e14)}
+  .status-card.critical{background:linear-gradient(135deg,#dc3545,#e83e8c)}
+  .status-card.info{background:linear-gradient(135deg,#17a2b8,#6f42c1)}
+  .status-card h4{margin:0;font-size:14px;opacity:0.9}
+  .status-card .value{font-size:24px;font-weight:700;margin:8px 0 0}
+  
+  .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:20px}
+  .form-group{display:flex;flex-direction:column}
+  .form-group label{font-weight:600;margin-bottom:6px;color:var(--text)}
+  .form-group input, .form-group select{padding:10px 12px;border:2px solid var(--border);border-radius:8px;font-size:14px;transition:border-color 0.2s}
+  .form-group input:focus, .form-group select:focus{outline:none;border-color:var(--accent)}
+  
+  .btn{padding:12px 24px;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;transition:all 0.2s;display:inline-flex;align-items:center;gap:8px}
+  .btn-primary{background:var(--accent);color:white}
+  .btn-primary:hover{background:#086;transform:translateY(-1px)}
+  .btn-success{background:var(--success);color:white}
+  .btn-warning{background:var(--warning);color:black}
+  .btn-danger{background:var(--danger);color:white}
+  .btn-info{background:var(--info);color:white}
+  
+  table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px}
+  th,td{padding:10px;text-align:left;border-bottom:1px solid var(--border)}
+  th{background:#f8f9fa;font-weight:600;color:var(--text);position:sticky;top:0}
+  tbody tr:hover{background:var(--table-stripe)}
+  .text-right{text-align:right}
+  .text-center{text-align:center}
+  
+  .alert{padding:16px;border-radius:8px;margin:16px 0;display:flex;align-items:center;gap:12px}
+  .alert-success{background:#d4edda;color:#155724;border:1px solid #c3e6cb}
+  .alert-warning{background:#fff3cd;color:#856404;border:1px solid #ffeaa7}
+  .alert-danger{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}
+  .alert-info{background:#d1ecf1;color:#0c5460;border:1px solid #bee5eb}
+  
+  .stock-level{display:flex;align-items:center;gap:8px}
+  .stock-bar{width:60px;height:6px;background:#e9ecef;border-radius:3px;overflow:hidden}
+  .stock-fill{height:100%;transition:width 0.3s}
+  .stock-fill.good{background:var(--success)}
+  .stock-fill.warning{background:var(--warning)}
+  .stock-fill.critical{background:var(--danger)}
+  
+  .decision-result{padding:20px;border-radius:12px;margin:16px 0;border-left:4px solid}
+  .decision-result.accept{background:#d4edda;border-color:var(--success);color:#155724}
+  .decision-result.caution{background:#fff3cd;border-color:var(--warning);color:#856404}
+  .decision-result.reject{background:#f8d7da;border-color:var(--danger);color:#721c24}
+  
+  .prediction-chart{background:#f8f9fa;border-radius:8px;padding:16px;margin:16px 0}
+  .chart-bar{height:20px;background:#e9ecef;border-radius:10px;margin:8px 0;position:relative}
+  .chart-fill{height:100%;border-radius:10px;display:flex;align-items:center;padding:0 12px;font-size:12px;font-weight:600;color:white}
+  .chart-fill.month1{background:#17a2b8;width:75%}
+  .chart-fill.month2{background:#28a745;width:90%}
+  .chart-fill.month3{background:#ffc107;width:60%;color:black}
+  
+  .tabs{display:flex;border-bottom:2px solid var(--border);margin-bottom:20px}
+  .tab{padding:12px 24px;cursor:pointer;border:none;background:none;font-weight:600;color:var(--muted)}
+  .tab.active{color:var(--accent);border-bottom:2px solid var(--accent)}
+  .tab-content{display:none}
+  .tab-content.active{display:block}
+  
+  .material-chip{display:inline-block;padding:4px 8px;border-radius:20px;font-size:11px;margin:2px}
+  .material-chip.paper{background:#e3f2fd;color:#1976d2}
+  .material-chip.glue{background:#f3e5f5;color:#7b1fa2}
+  .material-chip.handle{background:#e8f5e8;color:#388e3c}
+  .material-chip.patch{background:#fff3e0;color:#f57c00}
+  .material-chip.carton{background:#fce4ec;color:#c2185b}
+  
+  .reorder-suggestion{background:#f8f9fa;border-radius:8px;padding:16px;border-left:4px solid var(--info)}
+  .reorder-suggestion h4{margin:0 0 12px;color:var(--info)}
+  
+  .hidden{display:none !important}
+  .table-container{max-height:400px;overflow-y:auto;border:1px solid var(--border);border-radius:6px}
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🎯 Smart Inventory & Order Decision System</h1>
+      <p>Intelligent inventory management, order feasibility analysis, and demand prediction</p>
+    </div>
+
+    <div class="status-cards">
+      <div class="status-card good">
+        <h4>Total Stock Value</h4>
+        <div class="value" id="totalStockValue">€0</div>
+      </div>
+      <div class="status-card info">
+        <h4>Materials in Stock</h4>
+        <div class="value" id="materialsInStock">0</div>
+      </div>
+      <div class="status-card warning">
+        <h4>Low Stock Items</h4>
+        <div class="value" id="lowStockItems">0</div>
+      </div>
+      <div class="status-card critical">
+        <h4>Critical Items</h4>
+        <div class="value" id="criticalItems">0</div>
+      </div>
+    </div>
+
+    <div class="dashboard">
+      <!-- Order Analysis Section -->
+      <div class="card">
+        <h2>📝 Order Feasibility Analysis</h2>
+        
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Input Method</label>
+            <select id="inputMethod">
+              <option value="specs">Enter Specifications</option>
+              <option value="existing">Use Existing SKU</option>
+            </select>
+          </div>
+          
+          <div class="form-group existing-sku-field hidden">
+            <label>Select SKU</label>
+            <select id="existingSku">
+              <option value="">Choose SKU...</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label>Order Quantity</label>
+            <input type="number" id="orderQty" placeholder="e.g. 5000" min="1" value="5000">
+          </div>
+          
+          <div class="form-group">
+            <label>Delivery Date Needed</label>
+            <input type="date" id="deliveryDate">
+          </div>
+        </div>
+
+        <div id="specFields">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Width (mm)</label>
+              <input type="number" id="width" placeholder="320" min="100" max="500">
+            </div>
+            <div class="form-group">
+              <label>Gusset (mm)</label>
+              <input type="number" id="gusset" placeholder="160" min="80" max="250">
+            </div>
+            <div class="form-group">
+              <label>Height (mm)</label>
+              <input type="number" id="height" placeholder="380" min="200" max="500">
+            </div>
+            <div class="form-group">
+              <label>GSM</label>
+              <input type="number" id="gsm" placeholder="90" min="50" max="200">
+            </div>
+            <div class="form-group">
+              <label>Handle Type</label>
+              <select id="handleType">
+                <option value="FLAT HANDLE">Flat Handle</option>
+                <option value="TWISTED HANDLE">Twisted Handle</option>
+                <option value="SQR BOTTOM">Square Bottom</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Paper Grade</label>
+              <select id="paperGrade">
+                <option value="VIRGIN">Virgin Kraft</option>
+                <option value="RECYCLED">Recycled Kraft</option>
+                <option value="FIBREFORM">Fibreform</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <button type="button" class="btn btn-primary" id="analyzeOrderBtn">🔍 Analyze Order Feasibility</button>
+        
+        <div id="orderDecision" class="hidden"></div>
+      </div>
+
+      <!-- Current Inventory Overview -->
+      <div class="card">
+        <h2>📊 Current Inventory Status</h2>
+        
+        <div class="tabs">
+          <button class="tab active" onclick="showTab('materials')">Materials</button>
+          <button class="tab" onclick="showTab('predictions')">Predictions</button>
+          <button class="tab" onclick="showTab('reorders')">Reorders</button>
+        </div>
+
+        <div id="materials" class="tab-content active">
+          <div class="table-container">
+            <table id="inventoryTable">
+              <thead>
+                <tr>
+                  <th>Material</th>
+                  <th>SAP Code</th>
+                  <th>Current Stock</th>
+                  <th>Unit</th>
+                  <th>Status</th>
+                  <th>Days Left</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="predictions" class="tab-content">
+          <h4>📈 Demand Forecast (Next 3 Months)</h4>
+          <div class="prediction-chart">
+            <div>
+              <div>January 2025</div>
+              <div class="chart-bar">
+                <div class="chart-fill month1">15,000 bags expected</div>
+              </div>
+            </div>
+            <div>
+              <div>February 2025</div>
+              <div class="chart-bar">
+                <div class="chart-fill month2">18,000 bags expected</div>
+              </div>
+            </div>
+            <div>
+              <div>March 2025</div>
+              <div class="chart-bar">
+                <div class="chart-fill month3">12,000 bags expected</div>
+              </div>
+            </div>
+          </div>
+          <div class="alert alert-info">
+            📊 Based on historical data from the same period last year, adjusted for current trends.
+          </div>
+        </div>
+
+        <div id="reorders" class="tab-content">
+          <div id="reorderSuggestions"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detailed Analysis Results -->
+    <div id="detailedResults" class="hidden">
+      <div class="card">
+        <h2>📋 Detailed Material Analysis</h2>
+        <div id="materialBreakdown"></div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="card">
+      <h2>⚡ Quick Actions</h2>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <button class="btn btn-info" onclick="updateInventory()">🔄 Update Inventory</button>
+        <button class="btn btn-success" onclick="generateReport()">📊 Generate Report</button>
+        <button class="btn btn-warning" onclick="checkLowStock()">⚠️ Check Low Stock</button>
+        <button class="btn btn-primary" onclick="optimizeStock()">🎯 Optimize Stock Levels</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // Inventory data (current stock levels)
+  let inventory = {
+    // Paper materials
+    "1003696": { name: "Virgin Kraft 80-90 GSM", currentStock: 2500, unit: "KG", minStock: 500, price: 1.2, leadTime: 7 },
+    "1003697": { name: "Virgin Kraft 90 GSM", currentStock: 1800, unit: "KG", minStock: 400, price: 1.25, leadTime: 7 },
+    "1003771": { name: "Virgin Kraft 85 GSM", currentStock: 800, unit: "KG", minStock: 300, price: 1.15, leadTime: 7 },
+    "1003988": { name: "Virgin Kraft 75 GSM", currentStock: 600, unit: "KG", minStock: 200, price: 1.1, leadTime: 7 },
+    "1004286": { name: "Virgin Kraft 100 GSM", currentStock: 1200, unit: "KG", minStock: 350, price: 1.35, leadTime: 7 },
+    "1004359": { name: "Virgin Kraft 70 GSM", currentStock: 400, unit: "KG", minStock: 150, price: 1.05, leadTime: 7 },
+    "1003833": { name: "Virgin Kraft 150 GSM", currentStock: 800, unit: "KG", minStock: 200, price: 1.6, leadTime: 10 },
+    "1003998": { name: "Fibreform 150 GSM", currentStock: 500, unit: "KG", minStock: 150, price: 1.8, leadTime: 14 },
+    
+    // Glue materials  
+    "1004557": { name: "Cold Melt Adhesive", currentStock: 150, unit: "KG", minStock: 50, price: 3.5, leadTime: 5 },
+    "1004555": { name: "Hot Melt Adhesive", currentStock: 80, unit: "KG", minStock: 30, price: 4.2, leadTime: 5 },
+    
+    // Handle materials
+    "1003688": { name: "Flat Paper Handle", currentStock: 25, unit: "KG", minStock: 10, price: 2.8, leadTime: 10 },
+    "1003930": { name: "Flat Paper Handle (Alt)", currentStock: 30, unit: "KG", minStock: 12, price: 2.9, leadTime: 10 },
+    "1003967": { name: "Twisted Paper Handle", currentStock: 120, unit: "KG", minStock: 50, price: 1.2, leadTime: 14 },
+    
+    // Patch materials
+    "1003695": { name: "Handle Patch Standard", currentStock: 15, unit: "KG", minStock: 5, price: 1.8, leadTime: 7 },
+    "1003823": { name: "Handle Patch (Alt)", currentStock: 12, unit: "KG", minStock: 4, price: 1.9, leadTime: 7 },
+    "1003948": { name: "Twisted Handle Patch", currentStock: 8, unit: "KG", minStock: 3, price: 2.1, leadTime: 7 },
+    
+    // Carton materials
+    "1003530": { name: "Standard Carton Box", currentStock: 5000, unit: "PC", minStock: 1000, price: 0.12, leadTime: 3 },
+    "1004232": { name: "Small Carton Box", currentStock: 2000, unit: "PC", minStock: 500, price: 0.08, leadTime: 3 },
+    "1004289": { name: "Medium Carton Box", currentStock: 1500, unit: "PC", minStock: 400, price: 0.15, leadTime: 3 },
+    "1004308": { name: "Large Carton Box", currentStock: 1000, unit: "PC", minStock: 300, price: 0.22, leadTime: 3 }
+  };
+
+  // Historical data for predictions
+  const historicalData = {
+    dailyConsumption: {
+      "1003696": 45, // kg per day average
+      "1004557": 3.2,
+      "1004555": 1.8,
+      "1003688": 0.8,
+      "1003930": 0.9,
+      "1003695": 0.3,
+      "1003530": 80 // pieces per day
+    }
+  };
+
+  // SKU Data (abbreviated for demo)
+  const SKU_DATA = [
+    {"sku": "35718", "name": "ALDI SAC DE CAISSE PAPIER FSC2", "dimensions": "32×16×38", "gsm": "90", "bom": [{"type": "PAPER", "sapCode": "1003696", "quantity": 0.04417875, "unit": "KG"}, {"type": "HANDLE", "sapCode": "1003930", "quantity": 0.00551124, "unit": "KG"}, {"type": "PATCH", "sapCode": "1003823", "quantity": 0.00080136, "unit": "KG"}, {"type": "COLD GLUE", "sapCode": "1004557", "quantity": 0.001786491, "unit": "KG"}, {"type": "HOT GLUE", "sapCode": "1004555", "quantity": 0.000941711, "unit": "KG"}, {"type": "CARTON", "sapCode": "1003530", "quantity": 0.004, "unit": "PC"}]},
+    {"sku": "35627", "name": "CARREFOUR - SAC DE CAISSE PAPIER FSC2", "dimensions": "32×16×35", "gsm": "80", "bom": [{"type": "PAPER", "sapCode": "1003696", "quantity": 0.0388773, "unit": "KG"}, {"type": "HANDLE", "sapCode": "1003688", "quantity": 0.0052164, "unit": "KG"}, {"type": "PATCH", "sapCode": "1003695", "quantity": 0.0011907, "unit": "KG"}, {"type": "COLD GLUE", "sapCode": "1004557", "quantity": 0.001786491, "unit": "KG"}, {"type": "HOT GLUE", "sapCode": "1004555", "quantity": 0.000124117, "unit": "KG"}, {"type": "CARTON", "sapCode": "1003530", "quantity": 0.004, "unit": "PC"}]}
+  ];
+
+  // Initialize
+  document.addEventListener('DOMContentLoaded', function() {
+    populateSkuDropdown();
+    updateInventoryDisplay();
+    updateDashboardStats();
+    generateReorderSuggestions();
+    
+    // Set default delivery date to 2 weeks from now
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + 14);
+    document.getElementById('deliveryDate').value = futureDate.toISOString().split('T')[0];
+  });
+
+  // Populate SKU dropdown
+  function populateSkuDropdown() {
+    const select = document.getElementById('existingSku');
+    SKU_DATA.forEach(sku => {
+      const option = document.createElement('option');
+      option.value = sku.sku;
+      option.textContent = `${sku.sku} - ${sku.name}`;
+      select.appendChild(option);
+    });
+  }
+
+  // Toggle input method
+  document.getElementById('inputMethod').addEventListener('change', function() {
+    const existingField = document.querySelector('.existing-sku-field');
+    const specFields = document.getElementById('specFields');
+    
+    if (this.value === 'existing') {
+      existingField.classList.remove('hidden');
+      specFields.classList.add('hidden');
+    } else {
+      existingField.classList.add('hidden');
+      specFields.classList.remove('hidden');
+    }
+  });
+
+  // Load existing SKU data
+  document.getElementById('existingSku').addEventListener('change', function() {
+    const selectedSku = SKU_DATA.find(item => item.sku === this.value);
+    if (selectedSku) {
+      const dims = selectedSku.dimensions.split('×');
+      document.getElementById('width').value = dims[0] || '';
+      document.getElementById('gusset').value = dims[1] || '';
+      document.getElementById('height').value = dims[2] || '';
+      document.getElementById('gsm').value = selectedSku.gsm || '';
+    }
+  });
+
+  // Material database for auto-BOM generation
+  const MATERIAL_DATABASE = {
+    PAPER: {
+      VIRGIN: {
+        80: { sapCode: "1003696", description: "Virgin Kraft 80 GSM" },
+        90: { sapCode: "1003696", description: "Virgin Kraft 90 GSM" },
+        85: { sapCode: "1003771", description: "Virgin Kraft 85 GSM" },
+        100: { sapCode: "1004286", description: "Virgin Kraft 100 GSM" }
+      },
+      RECYCLED: {
+        80: { sapCode: "1003696", description: "Recycled Kraft 80 GSM" },
+        90: { sapCode: "1003696", description: "Recycled Kraft 90 GSM" }
+      },
+      FIBREFORM: {
+        150: { sapCode: "1003998", description: "Fibreform 150 GSM" }
+      }
+    },
+    GLUE: {
+      COLD: { sapCode: "1004557", description: "Cold Melt Adhesive" },
+      HOT: { sapCode: "1004555", description: "Hot Melt Adhesive" }
+    },
+    HANDLE: {
+      FLAT: { sapCode: "1003688", description: "Flat Paper Handle" },
+      FLAT_ALT: { sapCode: "1003930", description: "Flat Paper Handle (Alt)" },
+      TWISTED: { sapCode: "1003967", description: "Twisted Paper Handle" }
+    },
+    PATCH: {
+      FLAT: { sapCode: "1003695", description: "Handle Patch Standard" },
+      FLAT_ALT: { sapCode: "1003823", description: "Handle Patch (Alt)" },
+      TWISTED: { sapCode: "1003948", description: "Twisted Handle Patch" }
+    },
+    CARTON: {
+      STANDARD: { sapCode: "1003530", description: "Standard Carton Box" }
+    }
+  };
+
+  // Generate BOM for custom specifications
+  function generateBOM(specs) {
+    const bom = [];
+    
+    // Calculate paper requirement
+    const width = specs.width / 10;
+    const gusset = specs.gusset / 10; 
+    const height = specs.height / 10;
+    const totalArea = 2 * (width * height) + 2 * (gusset * height) + (width * gusset) + (width + gusset) * 2;
+    const paperWeight = (totalArea * specs.gsm / 1000) / 1000;
+    
+    const paperInfo = MATERIAL_DATABASE.PAPER[specs.paperGrade][specs.gsm] || MATERIAL_DATABASE.PAPER[specs.paperGrade][90];
+    bom.push({
+      type: "PAPER",
+      sapCode: paperInfo.sapCode,
+      description: paperInfo.description,
+      quantity: paperWeight,
+      unit: "KG"
+    });
+
+    // Add glue
+    bom.push({
+      type: "COLD GLUE",
+      sapCode: MATERIAL_DATABASE.GLUE.COLD.sapCode,
+      description: MATERIAL_DATABASE.GLUE.COLD.description,
+      quantity: 0.0018,
+      unit: "KG"
+    });
+
+    // Add handle and related materials
+    if (specs.handleType === "FLAT HANDLE") {
+      bom.push({
+        type: "HANDLE",
+        sapCode: MATERIAL_DATABASE.HANDLE.FLAT.sapCode,
+        description: MATERIAL_DATABASE.HANDLE.FLAT.description,
+        quantity: 0.0052,
+        unit: "KG"
+      });
+      
+      bom.push({
+        type: "PATCH", 
+        sapCode: MATERIAL_DATABASE.PATCH.FLAT.sapCode,
+        description: MATERIAL_DATABASE.PATCH.FLAT.description,
+        quantity: 0.0012,
+        unit: "KG"
+      });
+      
+      bom.push({
+        type: "HOT GLUE",
+        sapCode: MATERIAL_DATABASE.GLUE.HOT.sapCode,
+        description: MATERIAL_DATABASE.GLUE.HOT.description,
+        quantity: 0.0001,
+        unit: "KG"
+      });
+    } else if (specs.handleType === "TWISTED HANDLE") {
+      bom.push({
+        type: "HANDLE",
+        sapCode: MATERIAL_DATABASE.HANDLE.TWISTED.sapCode,
+        description: MATERIAL_DATABASE.HANDLE.TWISTED.description,
+        quantity: 0.7665,
+        unit: "KG"
+      });
+      
+      bom.push({
+        type: "PATCH",
+        sapCode: MATERIAL_DATABASE.PATCH.TWISTED.sapCode,
+        description: MATERIAL_DATABASE.PATCH.TWISTED.description,
+        quantity: 0.0036,
+        unit: "KG"
+      });
+      
+      bom.push({
+        type: "HOT GLUE",
+        sapCode: MATERIAL_DATABASE.GLUE.HOT.sapCode,
+        description: MATERIAL_DATABASE.GLUE.HOT.description,
+        quantity: 0.0011,
+        unit: "KG"
+      });
+    }
+
+    // Add carton
+    bom.push({
+      type: "CARTON",
+      sapCode: MATERIAL_DATABASE.CARTON.STANDARD.sapCode,
+      description: MATERIAL_DATABASE.CARTON.STANDARD.description,
+      quantity: 0.004,
+      unit: "PC"
+    });
+
+    return bom;
+  }
+
+  // Analyze order feasibility
+  document.getElementById('analyzeOrderBtn').addEventListener('click', function() {
+    const orderQty = parseInt(document.getElementById('orderQty').value);
+    const deliveryDate = new Date(document.getElementById('deliveryDate').value);
+    const inputMethod = document.getElementById('inputMethod').value;
+    
+    if (!orderQty || orderQty <= 0) {
+      alert('Please enter a valid order quantity');
+      return;
+    }
+
+    let bom;
+    let bagSpecs;
+
+    if (inputMethod === 'existing') {
+      const selectedSkuCode = document.getElementById('existingSku').value;
+      if (!selectedSkuCode) {
+        alert('Please select an existing SKU');
+        return;
+      }
+      const selectedSku = SKU_DATA.find(item => item.sku === selectedSkuCode);
+      bom = selectedSku.bom.filter(item => item.quantity != null && item.quantity > 0);
+      bagSpecs = `SKU ${selectedSku.sku} - ${selectedSku.name}`;
+    } else {
+      const specs = {
+        width: parseInt(document.getElementById('width').value),
+        gusset: parseInt(document.getElementById('gusset').value),
+        height: parseInt(document.getElementById('height').value),
+        gsm: parseInt(document.getElementById('gsm').value),
+        handleType: document.getElementById('handleType').value,
+        paperGrade: document.getElementById('paperGrade').value
+      };
+      
+      if (!specs.width || !specs.gusset || !specs.height || !specs.gsm) {
+        alert('Please fill in all specification fields');
+        return;
+      }
+      
+      bom = generateBOM(specs);
+      bagSpecs = `${specs.width}×${specs.gusset}×${specs.height}mm, ${specs.gsm}GSM, ${specs.handleType}`;
+    }
+
+    // Check material availability
+    const analysis = analyzeStockForOrder(bom, orderQty, deliveryDate);
+    displayOrderDecision(analysis, bagSpecs, orderQty);
+  });
+
+  // Analyze stock for order
+  function analyzeStockForOrder(bom, orderQty, deliveryDate) {
+    const daysToDelivery = Math.ceil((deliveryDate - new Date()) / (1000 * 60 * 60 * 24));
+    const materialRequirements = [];
+    let canFulfill = true;
+    let warnings = [];
+    let criticalIssues = [];
+    
+    bom.forEach(item => {
+      const totalRequired = item.quantity * orderQty;
+      const inventoryItem = inventory[item.sapCode];
+      
+      if (!inventoryItem) {
+        criticalIssues.push(`Material ${item.sapCode} not found in inventory`);
+        canFulfill = false;
+        return;
+      }
+
+      const dailyConsumption = historicalData.dailyConsumption[item.sapCode] || 0;
+      const projectedConsumption = dailyConsumption * daysToDelivery;
+      const availableStock = inventoryItem.currentStock - projectedConsumption;
+      const remainingAfterOrder = availableStock - totalRequired;
+      
+      const requirement = {
+        ...item,
+        totalRequired,
+        currentStock: inventoryItem.currentStock,
+        availableStock: Math.max(0, availableStock),
+        remainingAfterOrder,
+        inventoryItem,
+        daysToDelivery,
+        dailyConsumption,
+        projectedConsumption
+      };
+      
+      materialRequirements.push(requirement);
+      
+      if (remainingAfterOrder < 0) {
+        criticalIssues.push(`${item.type}: Need ${totalRequired.toFixed(3)}${item.unit}, only have ${availableStock.toFixed(3)}${item.unit} available`);
+        canFulfill = false;
+      } else if (remainingAfterOrder < inventoryItem.minStock) {
+        warnings.push(`${item.type}: Stock will drop below minimum level (${remainingAfterOrder.toFixed(3)}${item.unit} remaining, min: ${inventoryItem.minStock}${item.unit})`);
+      }
+    });
+    
+    return {
+      canFulfill,
+      materialRequirements,
+      warnings,
+      criticalIssues,
+      daysToDelivery
+    };
+  }
+
+  // Display order decision
+  function displayOrderDecision(analysis, bagSpecs, orderQty) {
+    const resultDiv = document.getElementById('orderDecision');
+    resultDiv.classList.remove('hidden');
+    
+    let decisionClass, decisionIcon, decisionTitle, decisionText;
+    
+    if (analysis.canFulfill && analysis.warnings.length === 0) {
+      decisionClass = 'accept';
+      decisionIcon = '✅';
+      decisionTitle = 'ORDER CAN BE ACCEPTED';
+      decisionText = 'All materials are available and stock levels will remain healthy.';
+    } else if (analysis.canFulfill && analysis.warnings.length > 0) {
+      decisionClass = 'caution';
+      decisionIcon = '⚠️';
+      decisionTitle = 'ACCEPT WITH CAUTION';
+      decisionText = 'Order can be fulfilled but will require material restocking.';
+    } else {
+      decisionClass = 'reject';
+      decisionIcon = '❌';
+      decisionTitle = 'CANNOT ACCEPT ORDER';
+      decisionText = 'Insufficient materials in stock. Immediate procurement required.';
+    }
+    
+    resultDiv.innerHTML = `
+      <div class="decision-result ${decisionClass}">
+        <h3>${decisionIcon} ${decisionTitle}</h3>
+        <p><strong>Order:</strong> ${orderQty.toLocaleString()} bags - ${bagSpecs}</p>
+        <p><strong>Delivery:</strong> ${analysis.daysToDelivery} days</p>
+        <p>${decisionText}</p>
+        
+        ${analysis.warnings.length > 0 ? `
+          <div style="margin-top:12px">
+            <strong>⚠️ Warnings:</strong>
+            <ul>${analysis.warnings.map(w => `<li>${w}</li>`).join('')}</ul>
+          </div>
+        ` : ''}
+        
+        ${analysis.criticalIssues.length > 0 ? `
+          <div style="margin-top:12px">
+            <strong>❌ Critical Issues:</strong>
+            <ul>${analysis.criticalIssues.map(i => `<li>${i}</li>`).join('')}</ul>
+          </div>
+        ` : ''}
+      </div>
+    `;
+    
+    // Show detailed breakdown
+    displayMaterialBreakdown(analysis.materialRequirements);
+    document.getElementById('detailedResults').classList.remove('hidden');
+  }
+
+  // Display material breakdown
+  function displayMaterialBreakdown(materials) {
+    const breakdownDiv = document.getElementById('materialBreakdown');
+    
+    const tableHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>Material</th>
+            <th>SAP Code</th>
+            <th>Required</th>
+            <th>Available</th>
+            <th>After Order</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${materials.map(material => {
+            let statusClass = 'good';
+            let statusText = '✅ Good';
+            
+            if (material.remainingAfterOrder < 0) {
+              statusClass = 'critical';
+              statusText = '❌ Insufficient';
+            } else if (material.remainingAfterOrder < material.inventoryItem.minStock) {
+              statusClass = 'warning';
+              statusText = '⚠️ Low';
+            }
+            
+            return `
+              <tr>
+                <td>
+                  <span class="material-chip ${material.type.toLowerCase().replace(' ', '-')}">${material.type}</span>
+                </td>
+                <td>${material.sapCode}</td>
+                <td>${material.totalRequired.toFixed(3)} ${material.unit}</td>
+                <td>${material.availableStock.toFixed(3)} ${material.unit}</td>
+                <td class="${statusClass}">${material.remainingAfterOrder.toFixed(3)} ${material.unit}</td>
+                <td class="${statusClass}">${statusText}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+    
+    breakdownDiv.innerHTML = tableHTML;
+  }
+
+  // Update inventory display
+  function updateInventoryDisplay() {
+    const tbody = document.querySelector('#inventoryTable tbody');
+    tbody.innerHTML = '';
+    
+    Object.entries(inventory).forEach(([sapCode, item]) => {
+      const dailyUsage = historicalData.dailyConsumption[sapCode] || 0;
+      const daysLeft = dailyUsage > 0 ? Math.floor(item.currentStock / dailyUsage) : '∞';
+      
+      let statusClass = 'good';
+      let statusText = '✅ Good';
+      
+      if (item.currentStock <= item.minStock * 0.5) {
+        statusClass = 'critical';
+        statusText = '🔴 Critical';
+      } else if (item.currentStock <= item.minStock) {
+        statusClass = 'warning';
+        statusText = '🟡 Low';
+      }
+      
+      const stockPercentage = Math.min(100, (item.currentStock / (item.minStock * 3)) * 100);
+      
+      tbody.innerHTML += `
+        <tr>
+          <td>${item.name}</td>
+          <td>${sapCode}</td>
+          <td>
+            <div class="stock-level">
+              ${item.currentStock.toLocaleString()} ${item.unit}
+              <div class="stock-bar">
+                <div class="stock-fill ${statusClass}" style="width: ${stockPercentage}%"></div>
+              </div>
+            </div>
+          </td>
+          <td>${item.unit}</td>
+          <td class="${statusClass}">${statusText}</td>
+          <td>${daysLeft}</td>
+        </tr>
+      `;
+    });
+  }
+
+  // Update dashboard statistics
+  function updateDashboardStats() {
+    const totalValue = Object.entries(inventory).reduce((sum, [code, item]) => {
+      return sum + (item.currentStock * item.price);
+    }, 0);
+    
+    const materialCount = Object.keys(inventory).length;
+    
+    const lowStockCount = Object.values(inventory).filter(item => 
+      item.currentStock <= item.minStock && item.currentStock > item.minStock * 0.5
+    ).length;
+    
+    const criticalCount = Object.values(inventory).filter(item => 
+      item.currentStock <= item.minStock * 0.5
+    ).length;
+    
+    document.getElementById('totalStockValue').textContent = `€${totalValue.toLocaleString()}`;
+    document.getElementById('materialsInStock').textContent = materialCount;
+    document.getElementById('lowStockItems').textContent = lowStockCount;
+    document.getElementById('criticalItems').textContent = criticalCount;
+  }
+
+  // Generate reorder suggestions
+  function generateReorderSuggestions() {
+    const suggestionsDiv = document.getElementById('reorderSuggestions');
+    const suggestions = [];
+    
+    Object.entries(inventory).forEach(([sapCode, item]) => {
+      if (item.currentStock <= item.minStock) {
+        const dailyUsage = historicalData.dailyConsumption[sapCode] || 0;
+        const safetyStock = item.minStock;
+        const leadTimeDemand = dailyUsage * item.leadTime;
+        const suggestedOrder = Math.max(safetyStock * 2, leadTimeDemand * 1.5);
+        
+        suggestions.push({
+          sapCode,
+          item,
+          suggestedOrder,
+          priority: item.currentStock <= item.minStock * 0.5 ? 'HIGH' : 'MEDIUM',
+          estimatedCost: suggestedOrder * item.price
+        });
+      }
+    });
+    
+    if (suggestions.length === 0) {
+      suggestionsDiv.innerHTML = '<div class="alert alert-success">🎉 All materials are well stocked!</div>';
+      return;
+    }
+    
+    // Sort by priority
+    suggestions.sort((a, b) => a.priority === 'HIGH' ? -1 : 1);
+    
+    suggestionsDiv.innerHTML = suggestions.map(suggestion => `
+      <div class="reorder-suggestion">
+        <h4>🔄 Reorder: ${suggestion.item.name}</h4>
+        <p><strong>SAP Code:</strong> ${suggestion.sapCode}</p>
+        <p><strong>Current Stock:</strong> ${suggestion.item.currentStock} ${suggestion.item.unit}</p>
+        <p><strong>Minimum Stock:</strong> ${suggestion.item.minStock} ${suggestion.item.unit}</p>
+        <p><strong>Suggested Order:</strong> ${Math.round(suggestion.suggestedOrder)} ${suggestion.item.unit}</p>
+        <p><strong>Estimated Cost:</strong> €${suggestion.estimatedCost.toFixed(2)}</p>
+        <p><strong>Priority:</strong> <span class="${suggestion.priority === 'HIGH' ? 'text-danger' : 'text-warning'}">${suggestion.priority}</span></p>
+        <p><strong>Lead Time:</strong> ${suggestion.item.leadTime} days</p>
+      </div>
+    `).join('');
+  }
+
+  // Tab functionality
+  function showTab(tabName) {
+    // Hide all tab contents
+    document.querySelectorAll('.tab-content').forEach(tab => {
+      tab.classList.remove('active');
+    });
+    
+    // Remove active class from all tabs
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.classList.remove('active');
+    });
+    
+    // Show selected tab content
+    document.getElementById(tabName).classList.add('active');
+    
+    // Add active class to clicked tab
+    event.target.classList.add('active');
+  }
+
+  // Quick action functions
+  function updateInventory() {
+    alert('🔄 Inventory updated! (This would connect to your ERP system)');
+    // Simulate small inventory changes
+    Object.keys(inventory).forEach(sapCode => {
+      const change = Math.random() * 20 - 10; // Random change between -10 and +10
+      inventory[sapCode].currentStock = Math.max(0, inventory[sapCode].currentStock + change);
+    });
+    updateInventoryDisplay();
+    updateDashboardStats();
+    generateReorderSuggestions();
+  }
+
+  function generateReport() {
+    alert('📊 Generating comprehensive inventory report... (Would export to PDF/Excel)');
+  }
+
+  function checkLowStock() {
+    const lowStock = Object.entries(inventory).filter(([code, item]) => 
+      item.currentStock <= item.minStock
+    );
+    
+    if (lowStock.length === 0) {
+      alert('✅ All materials are well stocked!');
+    } else {
+      const message = `⚠️ ${lowStock.length} items are below minimum stock:\n\n` + 
+        lowStock.map(([code, item]) => `• ${item.name}: ${item.currentStock} ${item.unit}`).join('\n');
+      alert(message);
+    }
+  }
+
+  function optimizeStock() {
+    alert('🎯 Stock optimization analysis complete! Recommendations have been updated.');
+    generateReorderSuggestions();
+  }
+
+  // Set material chip colors based on type
+  const materialColors = {
+    'paper': 'paper',
+    'cold-glue': 'glue',
+    'hot-glue': 'glue', 
+    'handle': 'handle',
+    'patch': 'patch',
+    'carton': 'carton'
+  };
+
+  // Initialize the page
+  window.addEventListener('load', function() {
+    console.log('Smart Inventory System loaded successfully!');
+  });
+</script>
+</body>
+</html>
