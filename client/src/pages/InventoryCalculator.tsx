@@ -225,9 +225,30 @@ export default function InventoryCalculator() {
 
   const getStockStatus = (current: number, min: number) => {
     const ratio = current / min;
-    if (ratio <= 1) return { status: 'critical', color: 'bg-red-500' };
-    if (ratio <= 2) return { status: 'low', color: 'bg-yellow-500' };
-    return { status: 'good', color: 'bg-green-500' };
+    if (ratio <= 1) return { 
+      status: 'critical' as const, 
+      color: 'bg-red-500', 
+      textColor: 'text-red-700',
+      bgColor: 'bg-red-50',
+      borderColor: 'border-red-200',
+      icon: '🚨'
+    };
+    if (ratio <= 2) return { 
+      status: 'low' as const, 
+      color: 'bg-yellow-500', 
+      textColor: 'text-yellow-700',
+      bgColor: 'bg-yellow-50',
+      borderColor: 'border-yellow-200',
+      icon: '⚠️'
+    };
+    return { 
+      status: 'good' as const, 
+      color: 'bg-green-500', 
+      textColor: 'text-green-700',
+      bgColor: 'bg-green-50',
+      borderColor: 'border-green-200',
+      icon: '✅'
+    };
   };
 
   const inventoryStats = Object.values(INVENTORY_DATA).reduce((acc, item) => {
@@ -254,27 +275,39 @@ export default function InventoryCalculator() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Status Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="gradient-summary-blue text-white">
+          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg">
             <CardContent className="p-6 text-center">
-              <h4 className="text-sm opacity-90 mb-2">Total Stock Value</h4>
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <span className="text-lg">💰</span>
+                <h4 className="text-sm opacity-90">Total Stock Value</h4>
+              </div>
               <div className="text-2xl font-bold">€{inventoryStats.totalValue.toFixed(0)}</div>
             </CardContent>
           </Card>
-          <Card className="gradient-summary-emerald text-white">
+          <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-0 shadow-lg">
             <CardContent className="p-6 text-center">
-              <h4 className="text-sm opacity-90 mb-2">Materials in Stock</h4>
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <span className="text-lg">📦</span>
+                <h4 className="text-sm opacity-90">Materials in Stock</h4>
+              </div>
               <div className="text-2xl font-bold">{inventoryStats.totalItems}</div>
             </CardContent>
           </Card>
-          <Card className="gradient-summary-amber text-white">
+          <Card className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white border-0 shadow-lg">
             <CardContent className="p-6 text-center">
-              <h4 className="text-sm opacity-90 mb-2">Low Stock Items</h4>
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <span className="text-lg">⚠️</span>
+                <h4 className="text-sm opacity-90">Low Stock Items</h4>
+              </div>
               <div className="text-2xl font-bold">{inventoryStats.lowStock}</div>
             </CardContent>
           </Card>
-          <Card className="gradient-summary-purple text-white">
+          <Card className="bg-gradient-to-br from-red-500 to-red-600 text-white border-0 shadow-lg">
             <CardContent className="p-6 text-center">
-              <h4 className="text-sm opacity-90 mb-2">Critical Items</h4>
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <span className="text-lg">🚨</span>
+                <h4 className="text-sm opacity-90">Critical Items</h4>
+              </div>
               <div className="text-2xl font-bold">{inventoryStats.critical}</div>
             </CardContent>
           </Card>
@@ -417,41 +450,58 @@ export default function InventoryCalculator() {
 
               {analysis && (
                 <div className="mt-6">
-                  <Alert className={`mb-4 ${analysis.feasible ? 'emerald-border-200 emerald-bg-50' : 'border-red-200 bg-red-50'}`}>
+                  <Alert className={`mb-4 border-2 ${analysis.feasible 
+                    ? 'border-green-200 bg-green-50' 
+                    : 'border-red-200 bg-red-50'
+                  }`}>
                     <div className="flex items-center gap-2">
                       {analysis.feasible ? (
-                        <CheckCircle className="h-4 w-4 emerald-text-700" />
+                        <CheckCircle className="h-5 w-5 text-green-600" />
                       ) : (
-                        <AlertTriangle className="h-4 w-4 text-red-700" />
+                        <AlertTriangle className="h-5 w-5 text-red-600" />
                       )}
-                      <AlertDescription className={analysis.feasible ? 'emerald-text-800' : 'text-red-800'}>
-                        <strong>{analysis.feasible ? 'Order Feasible' : 'Order Not Feasible'}</strong>
-                        <br />
-                        Total material cost: €{analysis.totalCost.toFixed(2)}
+                      <AlertDescription className={analysis.feasible ? 'text-green-800' : 'text-red-800'}>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{analysis.feasible ? '✅' : '❌'}</span>
+                          <div>
+                            <strong>{analysis.feasible ? 'Order Feasible' : 'Order Not Feasible'}</strong>
+                            <br />
+                            <span className="text-sm">Total material cost: €{analysis.totalCost.toFixed(2)}</span>
+                          </div>
+                        </div>
                       </AlertDescription>
                     </div>
                   </Alert>
 
                   {analysis.warnings.length > 0 && (
-                    <div className="mb-4">
-                      <h4 className="font-semibold text-amber-800 mb-2">⚠️ Warnings:</h4>
-                      <ul className="list-disc pl-5 space-y-1">
-                        {analysis.warnings.map((warning, index) => (
-                          <li key={index} className="text-sm text-amber-700">{warning}</li>
-                        ))}
-                      </ul>
-                    </div>
+                    <Alert className="mb-4 border-yellow-200 bg-yellow-50">
+                      <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                      <AlertDescription>
+                        <h4 className="font-semibold text-yellow-800 mb-2 flex items-center gap-2">
+                          <span>⚠️</span> Warnings:
+                        </h4>
+                        <ul className="list-disc pl-5 space-y-1">
+                          {analysis.warnings.map((warning, index) => (
+                            <li key={index} className="text-sm text-yellow-700">{warning}</li>
+                          ))}
+                        </ul>
+                      </AlertDescription>
+                    </Alert>
                   )}
 
                   {analysis.recommendations.length > 0 && (
-                    <div>
-                      <h4 className="font-semibold text-blue-800 mb-2">💡 Recommendations:</h4>
-                      <ul className="list-disc pl-5 space-y-1">
-                        {analysis.recommendations.map((rec, index) => (
-                          <li key={index} className="text-sm text-blue-700">{rec}</li>
-                        ))}
-                      </ul>
-                    </div>
+                    <Alert className="border-blue-200 bg-blue-50">
+                      <AlertDescription>
+                        <h4 className="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                          <span>💡</span> Recommendations:
+                        </h4>
+                        <ul className="list-disc pl-5 space-y-1">
+                          {analysis.recommendations.map((rec, index) => (
+                            <li key={index} className="text-sm text-blue-700">{rec}</li>
+                          ))}
+                        </ul>
+                      </AlertDescription>
+                    </Alert>
                   )}
                 </div>
               )}
@@ -480,28 +530,56 @@ export default function InventoryCalculator() {
                       <thead className="bg-muted sticky top-0">
                         <tr>
                           <th className="text-left p-3">Material</th>
-                          <th className="text-left p-3">Stock</th>
+                          <th className="text-left p-3">Current Stock</th>
+                          <th className="text-left p-3">Min Stock</th>
+                          <th className="text-left p-3">Stock Level</th>
                           <th className="text-left p-3">Status</th>
                         </tr>
                       </thead>
                       <tbody>
                         {Object.entries(INVENTORY_DATA).map(([sapCode, item]) => {
                           const stockStatus = getStockStatus(item.currentStock, item.minStock);
+                          const stockRatio = item.currentStock / item.minStock;
+                          const stockPercentage = Math.min(100, stockRatio * 50); // Cap at 100%
                           return (
-                            <tr key={sapCode} className="border-b hover:bg-muted/50">
+                            <tr key={sapCode} className={`border-b hover:${stockStatus.bgColor}/30 transition-colors`}>
                               <td className="p-3">
                                 <div>
                                   <div className="font-medium">{item.name}</div>
                                   <div className="text-xs text-muted-foreground">{sapCode}</div>
                                 </div>
                               </td>
-                              <td className="p-3">
-                                {item.currentStock.toFixed(item.unit === 'PC' ? 0 : 1)} {item.unit}
+                              <td className="p-3 font-mono">
+                                <span className={stockStatus.textColor}>
+                                  {item.currentStock.toFixed(item.unit === 'PC' ? 0 : 1)} {item.unit}
+                                </span>
+                              </td>
+                              <td className="p-3 font-mono text-muted-foreground">
+                                {item.minStock.toFixed(item.unit === 'PC' ? 0 : 1)} {item.unit}
                               </td>
                               <td className="p-3">
-                                <Badge variant={stockStatus.status === 'critical' ? 'destructive' : stockStatus.status === 'low' ? 'secondary' : 'default'}>
-                                  {stockStatus.status}
-                                </Badge>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div 
+                                      className={`h-full ${stockStatus.color} transition-all`}
+                                      style={{ width: `${stockPercentage}%` }}
+                                    ></div>
+                                  </div>
+                                  <span className="text-xs text-muted-foreground">
+                                    {stockRatio.toFixed(1)}x
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="p-3">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm">{stockStatus.icon}</span>
+                                  <Badge 
+                                    variant={stockStatus.status === 'critical' ? 'destructive' : stockStatus.status === 'low' ? 'secondary' : 'default'}
+                                    className={stockStatus.status === 'good' ? 'bg-green-100 text-green-800 hover:bg-green-100' : ''}
+                                  >
+                                    {stockStatus.status}
+                                  </Badge>
+                                </div>
                               </td>
                             </tr>
                           );
@@ -563,17 +641,50 @@ export default function InventoryCalculator() {
                     </h4>
                     {Object.entries(INVENTORY_DATA)
                       .filter(([_, item]) => item.currentStock <= item.minStock * 1.5)
-                      .map(([sapCode, item]) => (
-                        <Alert key={sapCode} className="border-blue-200 bg-blue-50">
-                          <Clock className="h-4 w-4" />
-                          <AlertDescription>
-                            <strong>{item.name}</strong> - Current: {item.currentStock}{item.unit}, 
-                            Min: {item.minStock}{item.unit}, Lead time: {item.leadTime} days
-                            <br />
-                            <em>Suggested order: {(item.minStock * 2).toFixed(0)}{item.unit}</em>
-                          </AlertDescription>
-                        </Alert>
-                      ))}
+                      .map(([sapCode, item]) => {
+                        const stockStatus = getStockStatus(item.currentStock, item.minStock);
+                        const suggestedOrder = (item.minStock * 2).toFixed(item.unit === 'PC' ? 0 : 1);
+                        const cost = (parseFloat(suggestedOrder) * item.price).toFixed(2);
+                        return (
+                          <Alert key={sapCode} className={`border-2 ${stockStatus.borderColor} ${stockStatus.bgColor}`}>
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">{stockStatus.icon}</span>
+                              <Clock className="h-4 w-4" />
+                            </div>
+                            <AlertDescription className={stockStatus.textColor}>
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <strong className="text-base">{item.name}</strong>
+                                  <div className="text-sm mt-1">
+                                    <span className="inline-block mr-4">Current: <span className="font-mono">{item.currentStock.toFixed(item.unit === 'PC' ? 0 : 1)}{item.unit}</span></span>
+                                    <span className="inline-block mr-4">Min: <span className="font-mono">{item.minStock.toFixed(item.unit === 'PC' ? 0 : 1)}{item.unit}</span></span>
+                                    <span className="inline-block">Lead time: <span className="font-semibold">{item.leadTime} days</span></span>
+                                  </div>
+                                  <div className="mt-2 text-sm">
+                                    <span className="font-semibold">Suggested order: </span>
+                                    <span className="font-mono bg-white px-2 py-1 rounded">{suggestedOrder}{item.unit}</span>
+                                    <span className="ml-2 text-muted-foreground">(Cost: €{cost})</span>
+                                  </div>
+                                </div>
+                                <Badge variant={stockStatus.status === 'critical' ? 'destructive' : 'secondary'}>
+                                  {stockStatus.status.toUpperCase()}
+                                </Badge>
+                              </div>
+                            </AlertDescription>
+                          </Alert>
+                        );
+                      })}
+                    {Object.entries(INVENTORY_DATA).filter(([_, item]) => item.currentStock <= item.minStock * 1.5).length === 0 && (
+                      <Alert className="border-green-200 bg-green-50">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <AlertDescription className="text-green-800">
+                          <div className="flex items-center gap-2">
+                            <span>✅</span>
+                            <span><strong>All materials are well stocked!</strong> No reorders needed at this time.</span>
+                          </div>
+                        </AlertDescription>
+                      </Alert>
+                    )}
                   </div>
                 </TabsContent>
               </Tabs>
@@ -601,31 +712,58 @@ export default function InventoryCalculator() {
                     </tr>
                   </thead>
                   <tbody>
-                    {analysis.materialRequirements.map((req, index) => (
-                      <tr key={index} className="border-b hover:bg-muted/50">
-                        <td className="p-3">
-                          <div>
-                            <div className="font-medium">{req.name}</div>
-                            <div className="text-xs text-muted-foreground">{req.sapCode}</div>
-                          </div>
-                        </td>
-                        <td className="text-right p-3">{req.required.toFixed(3)} {req.unit}</td>
-                        <td className="text-right p-3">{req.available.toFixed(3)} {req.unit}</td>
-                        <td className="text-right p-3">
-                          {req.shortage > 0 ? (
-                            <span className="text-red-600">-{req.shortage.toFixed(3)} {req.unit}</span>
-                          ) : (
-                            <span>{(req.available - req.required).toFixed(3)} {req.unit}</span>
-                          )}
-                        </td>
-                        <td className="text-right p-3">€{req.cost.toFixed(2)}</td>
-                        <td className="text-center p-3">
-                          <Badge variant={req.status === 'critical' ? 'destructive' : req.status === 'low' ? 'secondary' : 'default'}>
-                            {req.status}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
+                    {analysis.materialRequirements.map((req, index) => {
+                      const statusColors = getStockStatus(req.available, req.required);
+                      return (
+                        <tr key={index} className={`border-b hover:${statusColors.bgColor}/30 transition-colors`}>
+                          <td className="p-3">
+                            <div>
+                              <div className="font-medium">{req.name}</div>
+                              <div className="text-xs text-muted-foreground">{req.sapCode}</div>
+                            </div>
+                          </td>
+                          <td className="text-right p-3 font-mono">
+                            <span className="text-blue-700 font-semibold">
+                              {req.required.toFixed(3)} {req.unit}
+                            </span>
+                          </td>
+                          <td className="text-right p-3 font-mono">
+                            <span className={req.shortage > 0 ? 'text-red-600' : 'text-green-600'}>
+                              {req.available.toFixed(3)} {req.unit}
+                            </span>
+                          </td>
+                          <td className="text-right p-3 font-mono">
+                            {req.shortage > 0 ? (
+                              <span className="text-red-600 font-semibold flex items-center justify-end gap-1">
+                                <span>🚨</span>
+                                -{req.shortage.toFixed(3)} {req.unit}
+                              </span>
+                            ) : (
+                              <span className="text-green-600 font-semibold flex items-center justify-end gap-1">
+                                <span>✅</span>
+                                {(req.available - req.required).toFixed(3)} {req.unit}
+                              </span>
+                            )}
+                          </td>
+                          <td className="text-right p-3 font-mono font-semibold">
+                            €{req.cost.toFixed(2)}
+                          </td>
+                          <td className="text-center p-3">
+                            <div className="flex items-center justify-center gap-2">
+                              <span className="text-sm">
+                                {req.status === 'critical' ? '🚨' : req.status === 'low' ? '⚠️' : '✅'}
+                              </span>
+                              <Badge 
+                                variant={req.status === 'critical' ? 'destructive' : req.status === 'low' ? 'secondary' : 'default'}
+                                className={req.status === 'sufficient' ? 'bg-green-100 text-green-800 hover:bg-green-100' : ''}
+                              >
+                                {req.status}
+                              </Badge>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
