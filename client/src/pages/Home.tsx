@@ -5,37 +5,31 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calculator, Trash2, Package, Factory, TrendingUp, Weight } from "lucide-react";
-
-// Material database and SKU data from original HTML
-const DATA = [
-  {"sku": "35293", "name": "BROWN KRAFT BAG INT. FLAT HANDLES FSC2", "dimensions": "32×16×38", "gsm": "90", "bag_weight": "0.0458", "handle_type": "FLAT HANDLE", "box_qty": "250", "cert": "FSC", "paper_grade": "VIRGIN", "machines": "M1,M2,M4", "remarks": "Standard production", "bom": [{"type": "PAPER", "sapCode": "1003696", "quantity": 0.0, "unit": "KG"}, {"type": "COLD GLUE", "sapCode": "1004557", "quantity": 0.001786491, "unit": "KG"}, {"type": "HOT GLUE", "sapCode": "0", "quantity": null, "unit": "KG"}], "total_kg": 0.001786491},
-  {"sku": "35718", "name": "ALDI SAC DE CAISSE PAPIER FSC2", "dimensions": "32×16×38", "gsm": "90", "bag_weight": "0.0458", "handle_type": "FLAT HANDLE", "box_qty": "250", "cert": "FSC", "paper_grade": "VIRGIN", "machines": "NL1,NL2,M4", "remarks": "Aldi custom", "bom": [{"type": "PAPER", "sapCode": "1003696", "quantity": 0.04417875, "unit": "KG"}, {"type": "HANDLE", "sapCode": "1003930", "quantity": 0.00551124, "unit": "KG"}, {"type": "PATCH", "sapCode": "1003823", "quantity": 0.00080136, "unit": "KG"}, {"type": "COLD GLUE", "sapCode": "1004557", "quantity": 0.001786491, "unit": "KG"}, {"type": "HOT GLUE", "sapCode": "1004555", "quantity": 0.000941711, "unit": "KG"}, {"type": "CARTON", "sapCode": "1003530", "quantity": 0.004, "unit": "PC"}], "total_kg": 0.053219552},
-  {"sku": "33441", "name": "MONOPRIX SAC PAPIER LAD FSC2", "dimensions": "32×21×35", "gsm": "90", "bag_weight": "0.0500", "handle_type": "FLAT HANDLE", "box_qty": "250", "cert": "FSC", "paper_grade": "VIRGIN", "machines": "M2,M3", "remarks": "Monoprix custom", "bom": [{"type": "PAPER", "sapCode": "1003697", "quantity": 0.0466956, "unit": "KG"}, {"type": "HANDLE", "sapCode": "1003688", "quantity": 0.0052164, "unit": "KG"}, {"type": "PATCH", "sapCode": "1003695", "quantity": 0.0011907, "unit": "KG"}, {"type": "COLD GLUE", "sapCode": "1004557", "quantity": 0.001786491, "unit": "KG"}, {"type": "HOT GLUE", "sapCode": "1004555", "quantity": 0.000124117, "unit": "KG"}, {"type": "CARTON", "sapCode": "1003530", "quantity": 0.004, "unit": "PC"}], "total_kg": 0.055013308000000004}
-];
+import { SKU_DATA, type SKUData } from "@/data/skuData";
 
 const MATERIAL_DATABASE = {
   PAPER: {
     VIRGIN: {
-      50: { sapCode: "1004016", description: "Virgin Kraft 50 GSM" },
-      70: { sapCode: "1004359", description: "Virgin Kraft 70 GSM" },
-      75: { sapCode: "1003988", description: "Virgin Kraft 75 GSM" },
-      80: { sapCode: "1003696", description: "Virgin Kraft 80 GSM" },
-      85: { sapCode: "1003771", description: "Virgin Kraft 85 GSM" },
-      90: { sapCode: "1003696", description: "Virgin Kraft 90 GSM" },
-      100: { sapCode: "1004286", description: "Virgin Kraft 100 GSM" },
-      120: { sapCode: "1004369", description: "Virgin Kraft 120 GSM" },
-      150: { sapCode: "1003833", description: "Virgin Kraft 150 GSM" }
+      "50": { sapCode: "1004016", description: "Virgin Kraft 50 GSM" },
+      "70": { sapCode: "1004359", description: "Virgin Kraft 70 GSM" },
+      "75": { sapCode: "1003988", description: "Virgin Kraft 75 GSM" },
+      "80": { sapCode: "1003696", description: "Virgin Kraft 80 GSM" },
+      "85": { sapCode: "1003771", description: "Virgin Kraft 85 GSM" },
+      "90": { sapCode: "1003696", description: "Virgin Kraft 90 GSM" },
+      "100": { sapCode: "1004286", description: "Virgin Kraft 100 GSM" },
+      "120": { sapCode: "1004369", description: "Virgin Kraft 120 GSM" },
+      "150": { sapCode: "1003833", description: "Virgin Kraft 150 GSM" }
     },
     RECYCLED: {
-      50: { sapCode: "1004016", description: "Recycled Kraft 50 GSM" },
-      70: { sapCode: "1004359", description: "Recycled Kraft 70 GSM" },
-      80: { sapCode: "1003696", description: "Recycled Kraft 80 GSM" },
-      85: { sapCode: "1003696", description: "Recycled Kraft 85 GSM" },
-      90: { sapCode: "1003696", description: "Recycled Kraft 90 GSM" },
-      100: { sapCode: "1004017", description: "Recycled Kraft 100 GSM" }
+      "50": { sapCode: "1004016", description: "Recycled Kraft 50 GSM" },
+      "70": { sapCode: "1004359", description: "Recycled Kraft 70 GSM" },
+      "80": { sapCode: "1003696", description: "Recycled Kraft 80 GSM" },
+      "85": { sapCode: "1003696", description: "Recycled Kraft 85 GSM" },
+      "90": { sapCode: "1003696", description: "Recycled Kraft 90 GSM" },
+      "100": { sapCode: "1004017", description: "Recycled Kraft 100 GSM" }
     },
     FIBREFORM: {
-      150: { sapCode: "1003998", description: "Fibreform 150 GSM" }
+      "150": { sapCode: "1003998", description: "Fibreform 150 GSM" }
     }
   },
   GLUE: {
@@ -58,7 +52,7 @@ const MATERIAL_DATABASE = {
     MEDIUM: { sapCode: "1004289", description: "Medium Carton Box" },
     LARGE: { sapCode: "1004308", description: "Large Carton Box" }
   }
-};
+} as const;
 
 type BOMItem = {
   type: string;
@@ -104,7 +98,7 @@ export default function Home() {
   // Load existing SKU data when selected
   useEffect(() => {
     if (existingSku && inputMethod === 'existing') {
-      const selectedSku = DATA.find(item => item.sku === existingSku);
+      const selectedSku = SKU_DATA.find(item => item.sku === existingSku);
       if (selectedSku) {
         const dims = selectedSku.dimensions.split('×');
         setBagName(selectedSku.name);
@@ -140,8 +134,9 @@ export default function Home() {
     const paperWeight = (totalArea * paperWeightPerCm2) / 1000; // Convert to kg
     
     // Get paper SAP code
-    const paperInfo = MATERIAL_DATABASE.PAPER[specs.paperGrade as keyof typeof MATERIAL_DATABASE.PAPER]?.[specs.gsm] || 
-                     MATERIAL_DATABASE.PAPER[specs.paperGrade as keyof typeof MATERIAL_DATABASE.PAPER]?.[90]; // Default to 90 GSM
+    const paperGradeData = MATERIAL_DATABASE.PAPER[specs.paperGrade as keyof typeof MATERIAL_DATABASE.PAPER];
+    const gsmStr = specs.gsm.toString();
+    const paperInfo = (paperGradeData as any)?.[gsmStr] || (paperGradeData as any)?.["90"]; // Default to 90 GSM
     
     if (paperInfo) {
       bom.push({
@@ -261,7 +256,7 @@ export default function Home() {
         return;
       }
 
-      const selectedSku = DATA.find(item => item.sku === existingSku);
+      const selectedSku = SKU_DATA.find(item => item.sku === existingSku);
       if (!selectedSku) {
         alert('SKU data not found');
         return;
@@ -287,7 +282,7 @@ export default function Home() {
         type: item.type,
         sapCode: item.sapCode,
         description: `${item.type} - ${item.sapCode}`,
-        quantity: item.quantity,
+        quantity: item.quantity!,
         unit: item.unit
       }));
 
@@ -386,7 +381,7 @@ export default function Home() {
                       <SelectValue placeholder="Choose an existing SKU..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {DATA.map(item => (
+                      {SKU_DATA.map(item => (
                         <SelectItem key={item.sku} value={item.sku}>
                           {item.sku} - {item.name}
                         </SelectItem>
