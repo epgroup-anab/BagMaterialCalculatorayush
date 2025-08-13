@@ -1,5 +1,5 @@
 modules = ["nodejs-20", "web", "postgresql-16"]
-run = "npm run dev"
+run = "npm start"
 hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
@@ -16,6 +16,7 @@ externalPort = 80
 
 [env]
 PORT = "5000"
+NODE_ENV = "production"
 
 [workflows]
 runButton = "Project"
@@ -35,5 +36,5 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run dev"
+args = "npm start"
 waitForPort = 5000
