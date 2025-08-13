@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Calculator, Package, TrendingUp, AlertTriangle, CheckCircle, Clock, RefreshCw } from "lucide-react";
+import { Calculator, Package, TrendingUp, AlertTriangle, CheckCircle, Clock, RefreshCw, Settings, Cpu } from "lucide-react";
 import { SKU_DATA, type SKUData } from "@/data/skuData";
 
 // Inventory data (current stock levels)
@@ -40,6 +40,148 @@ const INVENTORY_DATA = {
   "1004232": { name: "Small Carton Box", currentStock: 1500, unit: "PC", minStock: 300, price: 0.12, leadTime: 3 },
   "1004289": { name: "Medium Carton Box", currentStock: 1000, unit: "PC", minStock: 200, price: 0.18, leadTime: 3 },
   "1004308": { name: "Large Carton Box", currentStock: 800, unit: "PC", minStock: 150, price: 0.22, leadTime: 3 }
+};
+
+// Machine specifications database
+const MACHINES_DATA = {
+  'M1': {
+    name: 'M1',
+    category: 'GM 5QT FH',
+    description: 'Garant Triumph 5QT',
+    handleType: 'FLAT HANDLE',
+    maxColors: 1,
+    dailyCapacity: 82000,
+    speed: 100,
+    minWidth: 800,
+    maxWidth: 1100,
+    minGSM: 70,
+    maxGSM: 100,
+    status: 'available',
+    currentUtilization: 65
+  },
+  'M2': {
+    name: 'M2',
+    category: 'GM 5QT FH',
+    description: 'Garant Triumph 5QT',
+    handleType: 'FLAT HANDLE',
+    maxColors: 3,
+    dailyCapacity: 82000,
+    speed: 100,
+    minWidth: 800,
+    maxWidth: 1100,
+    minGSM: 70,
+    maxGSM: 100,
+    status: 'busy',
+    currentUtilization: 85
+  },
+  'M3': {
+    name: 'M3',
+    category: 'GM 5QT FH',
+    description: 'Garant Triumph 5QT',
+    handleType: 'FLAT HANDLE',
+    maxColors: 3,
+    dailyCapacity: 82000,
+    speed: 100,
+    minWidth: 800,
+    maxWidth: 1100,
+    minGSM: 70,
+    maxGSM: 100,
+    status: 'available',
+    currentUtilization: 45
+  },
+  'M4': {
+    name: 'M4',
+    category: 'GM 5QT FH',
+    description: 'Garant Triumph 5QT',
+    handleType: 'FLAT HANDLE',
+    maxColors: 1,
+    dailyCapacity: 82000,
+    speed: 100,
+    minWidth: 800,
+    maxWidth: 1100,
+    minGSM: 70,
+    maxGSM: 100,
+    status: 'available',
+    currentUtilization: 30
+  },
+  'M5': {
+    name: 'M5',
+    category: 'GM 5F6 FH',
+    description: 'Garant 5F6',
+    handleType: 'FLAT HANDLE',
+    maxColors: 4,
+    dailyCapacity: 82000,
+    speed: 100,
+    minWidth: 700,
+    maxWidth: 1200,
+    minGSM: 70,
+    maxGSM: 110,
+    supportsPatch: true,
+    status: 'available',
+    currentUtilization: 55
+  },
+  'M6': {
+    name: 'M6',
+    category: 'GM 5F6 TH',
+    description: 'Garant 5F6',
+    handleType: 'TWISTED HANDLE',
+    maxColors: 2,
+    dailyCapacity: 82000,
+    speed: 100,
+    minWidth: 700,
+    maxWidth: 1200,
+    minGSM: 70,
+    maxGSM: 110,
+    status: 'maintenance',
+    currentUtilization: 0
+  },
+  'NL1': {
+    name: 'NL1',
+    category: 'NL FH',
+    description: 'Newlong',
+    handleType: 'FLAT HANDLE',
+    maxColors: 2,
+    dailyCapacity: 65600,
+    speed: 80,
+    minWidth: 750,
+    maxWidth: 1000,
+    minGSM: 75,
+    maxGSM: 95,
+    status: 'available',
+    currentUtilization: 70
+  },
+  'NL2': {
+    name: 'NL2',
+    category: 'NL FH',
+    description: 'Newlong',
+    handleType: 'FLAT HANDLE',
+    maxColors: 2,
+    dailyCapacity: 65600,
+    speed: 80,
+    minWidth: 750,
+    maxWidth: 1000,
+    minGSM: 75,
+    maxGSM: 95,
+    status: 'available',
+    currentUtilization: 40
+  }
+};
+
+type MachineData = {
+  name: string;
+  category: string;
+  description: string;
+  handleType: string;
+  maxColors: number;
+  dailyCapacity: number;
+  speed: number;
+  minWidth: number;
+  maxWidth: number;
+  minGSM: number;
+  maxGSM: number;
+  supportsPatch?: boolean;
+  status: 'available' | 'busy' | 'maintenance';
+  currentUtilization: number;
 };
 
 type MaterialRequirement = {
@@ -78,6 +220,22 @@ export default function InventoryCalculator() {
   const [analysis, setAnalysis] = useState<InventoryAnalysis | null>(null);
   const [activeTab, setActiveTab] = useState('materials');
   const [stockData, setStockData] = useState<Record<string, number>>({});
+  
+  // Machine assignment state
+  const [machineOrderSpec, setMachineOrderSpec] = useState({
+    orderName: "",
+    bagWidth: "",
+    bagHeight: "",
+    bagGusset: "",
+    paperGSM: "",
+    paperWidth: "",
+    handleType: "FLAT HANDLE",
+    patchType: "none",
+    colors: 0,
+    quantity: "",
+    deliveryDays: ""
+  });
+  const [machineAnalysis, setMachineAnalysis] = useState<any>(null);
 
   // Fetch stock data from QuickBase API
   const fetchStockData = async (sapCode: string): Promise<number> => {
@@ -284,6 +442,125 @@ export default function InventoryCalculator() {
       borderColor: 'border-green-200',
       icon: '✅'
     };
+  };
+
+  // Machine compatibility and analysis functions
+  const checkMachineCompatibility = (machine: MachineData, specs: any) => {
+    const reasons = [];
+    let compatible = true;
+
+    // Check handle type
+    if (specs.handleType !== 'none' && machine.handleType !== specs.handleType) {
+      compatible = false;
+      reasons.push(`Requires ${specs.handleType} handle, machine has ${machine.handleType}`);
+    }
+
+    // Check color capability  
+    if (specs.colors > machine.maxColors) {
+      compatible = false;
+      reasons.push(`Requires ${specs.colors} colors, machine supports max ${machine.maxColors}`);
+    }
+
+    // Check paper width
+    const paperWidth = parseInt(specs.paperWidth);
+    if (paperWidth && (paperWidth < machine.minWidth || paperWidth > machine.maxWidth)) {
+      compatible = false;
+      reasons.push(`Paper width ${paperWidth}mm outside range (${machine.minWidth}-${machine.maxWidth}mm)`);
+    }
+
+    // Check GSM
+    const paperGSM = parseInt(specs.paperGSM);
+    if (paperGSM && (paperGSM < machine.minGSM || paperGSM > machine.maxGSM)) {
+      compatible = false;
+      reasons.push(`GSM ${paperGSM} outside range (${machine.minGSM}-${machine.maxGSM})`);
+    }
+
+    // Check patch support
+    if (specs.patchType === 'double' && !machine.supportsPatch) {
+      compatible = false;
+      reasons.push('Double patch not supported');
+    }
+
+    return { compatible, reasons };
+  };
+
+  const calculateMachineProduction = (machine: MachineData, specs: any) => {
+    // Color capacity adjustment factors
+    const colorFactors: Record<number, number> = {
+      0: 1.0,   // No printing
+      1: 1.0,   // 1 color
+      2: 0.87,  // 2 colors
+      3: 1.0,   // 3 colors
+      4: 0.33   // 4 colors
+    };
+
+    const colorFactor = colorFactors[specs.colors] || 1.0;
+    const adjustedCapacity = machine.dailyCapacity * colorFactor;
+    
+    // Adjust for patch complexity
+    let patchFactor = 1.0;
+    if (specs.patchType === 'single') patchFactor = 0.95;
+    if (specs.patchType === 'double') patchFactor = 0.90;
+    
+    const finalCapacity = Math.floor(adjustedCapacity * patchFactor);
+    const quantity = parseInt(specs.quantity);
+    const deliveryDays = parseInt(specs.deliveryDays);
+    
+    if (!quantity || !deliveryDays) {
+      return {
+        adjustedCapacity: finalCapacity,
+        daysRequired: 0,
+        hoursRequired: 0,
+        utilization: 0,
+        canMeetDeadline: false
+      };
+    }
+
+    const daysRequired = Math.ceil(quantity / finalCapacity);
+    const hoursRequired = parseFloat((quantity / (finalCapacity / 16)).toFixed(1)); // 16 working hours
+    const utilization = Math.min((quantity / finalCapacity) * 100, 100);
+
+    return {
+      adjustedCapacity: finalCapacity,
+      daysRequired,
+      hoursRequired,
+      utilization,
+      canMeetDeadline: daysRequired <= deliveryDays
+    };
+  };
+
+  const analyzeMachineAssignment = () => {
+    if (!machineOrderSpec.quantity || !machineOrderSpec.deliveryDays) {
+      return;
+    }
+
+    const machineResults = Object.entries(MACHINES_DATA).map(([machineId, machine]) => {
+      const compatibility = checkMachineCompatibility(machine as MachineData, machineOrderSpec);
+      const production = calculateMachineProduction(machine as MachineData, machineOrderSpec);
+      
+      return {
+        machineId,
+        machine,
+        compatibility,
+        production,
+        score: compatibility.compatible ? 
+          (production.canMeetDeadline ? 100 - machine.currentUtilization : 50) : 0
+      };
+    });
+
+    // Sort by compatibility and score
+    machineResults.sort((a, b) => {
+      if (a.compatibility.compatible && !b.compatibility.compatible) return -1;
+      if (!a.compatibility.compatible && b.compatibility.compatible) return 1;
+      return b.score - a.score;
+    });
+
+    setMachineAnalysis({
+      machines: machineResults,
+      feasible: machineResults.some(m => m.compatibility.compatible && m.production.canMeetDeadline),
+      totalMachines: machineResults.length,
+      compatibleMachines: machineResults.filter(m => m.compatibility.compatible).length
+    });
   };
 
   const inventoryStats = Object.entries(INVENTORY_DATA).reduce((acc, [sapCode, item]) => {
@@ -554,10 +831,11 @@ export default function InventoryCalculator() {
             </CardHeader>
             <CardContent>
               <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-3">
+                <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="materials">Materials</TabsTrigger>
                   <TabsTrigger value="predictions">Forecast</TabsTrigger>
                   <TabsTrigger value="reorders">Reorders</TabsTrigger>
+                  <TabsTrigger value="machines">🏭 Machines</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="materials" className="mt-4">
@@ -723,6 +1001,278 @@ export default function InventoryCalculator() {
                         </AlertDescription>
                       </Alert>
                     )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="machines" className="mt-4">
+                  <div className="space-y-6">
+                    <div>
+                      <h4 className="font-semibold flex items-center gap-2 mb-4">
+                        <Settings className="h-4 w-4" />
+                        Machine Assignment Calculator
+                      </h4>
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                        <div className="space-y-2">
+                          <Label>Order Name</Label>
+                          <Input
+                            value={machineOrderSpec.orderName}
+                            onChange={(e) => setMachineOrderSpec(prev => ({...prev, orderName: e.target.value}))}
+                            placeholder="e.g. Supermarket A"
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label>Bag Width (mm)</Label>
+                          <Input
+                            type="number"
+                            value={machineOrderSpec.bagWidth}
+                            onChange={(e) => setMachineOrderSpec(prev => ({...prev, bagWidth: e.target.value}))}
+                            placeholder="320"
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label>Bag Height (mm)</Label>
+                          <Input
+                            type="number"
+                            value={machineOrderSpec.bagHeight}
+                            onChange={(e) => setMachineOrderSpec(prev => ({...prev, bagHeight: e.target.value}))}
+                            placeholder="220"
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label>Bag Gusset (mm)</Label>
+                          <Input
+                            type="number"
+                            value={machineOrderSpec.bagGusset}
+                            onChange={(e) => setMachineOrderSpec(prev => ({...prev, bagGusset: e.target.value}))}
+                            placeholder="70"
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label>Paper GSM</Label>
+                          <Input
+                            type="number"
+                            value={machineOrderSpec.paperGSM}
+                            onChange={(e) => setMachineOrderSpec(prev => ({...prev, paperGSM: e.target.value}))}
+                            placeholder="80"
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label>Paper Width (mm)</Label>
+                          <Input
+                            type="number"
+                            value={machineOrderSpec.paperWidth}
+                            onChange={(e) => setMachineOrderSpec(prev => ({...prev, paperWidth: e.target.value}))}
+                            placeholder="850"
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label>Handle Type</Label>
+                          <Select 
+                            value={machineOrderSpec.handleType} 
+                            onValueChange={(value) => setMachineOrderSpec(prev => ({...prev, handleType: value}))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="FLAT HANDLE">Flat Handle</SelectItem>
+                              <SelectItem value="TWISTED HANDLE">Twisted Handle</SelectItem>
+                              <SelectItem value="none">No Handle</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label>Patch Type</Label>
+                          <Select 
+                            value={machineOrderSpec.patchType} 
+                            onValueChange={(value) => setMachineOrderSpec(prev => ({...prev, patchType: value}))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">No Patch</SelectItem>
+                              <SelectItem value="single">Single Patch</SelectItem>
+                              <SelectItem value="double">Double Patch</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label>Colors</Label>
+                          <Select 
+                            value={machineOrderSpec.colors.toString()} 
+                            onValueChange={(value) => setMachineOrderSpec(prev => ({...prev, colors: parseInt(value)}))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="0">0 Colors</SelectItem>
+                              <SelectItem value="1">1 Color</SelectItem>
+                              <SelectItem value="2">2 Colors</SelectItem>
+                              <SelectItem value="3">3 Colors</SelectItem>
+                              <SelectItem value="4">4 Colors</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label>Quantity</Label>
+                          <Input
+                            type="number"
+                            value={machineOrderSpec.quantity}
+                            onChange={(e) => setMachineOrderSpec(prev => ({...prev, quantity: e.target.value}))}
+                            placeholder="10000"
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label>Delivery Days</Label>
+                          <Input
+                            type="number"
+                            value={machineOrderSpec.deliveryDays}
+                            onChange={(e) => setMachineOrderSpec(prev => ({...prev, deliveryDays: e.target.value}))}
+                            placeholder="7"
+                          />
+                        </div>
+                      </div>
+
+                      <Button 
+                        onClick={analyzeMachineAssignment}
+                        disabled={!machineOrderSpec.quantity || !machineOrderSpec.deliveryDays}
+                        className="w-full mb-6"
+                        data-testid="button-analyze-machines"
+                      >
+                        <Cpu className="h-4 w-4 mr-2" />
+                        Analyze Machine Compatibility
+                      </Button>
+
+                      {machineAnalysis && (
+                        <div className="space-y-4">
+                          <Alert className={machineAnalysis.feasible ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}>
+                            <AlertDescription>
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">{machineAnalysis.feasible ? '✅' : '❌'}</span>
+                                <div>
+                                  <strong>{machineAnalysis.feasible ? 'Order Can Be Produced' : 'No Suitable Machine Available'}</strong>
+                                  <br />
+                                  <span className="text-sm">
+                                    {machineAnalysis.compatibleMachines} out of {machineAnalysis.totalMachines} machines are compatible
+                                  </span>
+                                </div>
+                              </div>
+                            </AlertDescription>
+                          </Alert>
+
+                          <div className="grid gap-4">
+                            {machineAnalysis.machines.map((result: any) => {
+                              const machine = result.machine;
+                              const isCompatible = result.compatibility.compatible;
+                              const canMeetDeadline = result.production.canMeetDeadline;
+                              
+                              let statusColor = 'bg-red-50 border-red-200';
+                              let statusIcon = '❌';
+                              let statusText = 'Not Compatible';
+                              
+                              if (isCompatible && canMeetDeadline) {
+                                statusColor = 'bg-green-50 border-green-200';
+                                statusIcon = '✅';
+                                statusText = 'Perfect Match';
+                              } else if (isCompatible && !canMeetDeadline) {
+                                statusColor = 'bg-yellow-50 border-yellow-200';
+                                statusIcon = '⚠️';
+                                statusText = 'Compatible but Slow';
+                              }
+
+                              return (
+                                <Card key={result.machineId} className={`${statusColor} border-2`}>
+                                  <CardContent className="p-4">
+                                    <div className="flex justify-between items-start mb-3">
+                                      <div>
+                                        <h5 className="font-bold text-lg flex items-center gap-2">
+                                          <span>{statusIcon}</span>
+                                          {machine.name} - {machine.category}
+                                        </h5>
+                                        <p className="text-sm text-muted-foreground">{machine.description}</p>
+                                        <div className="flex items-center gap-4 mt-2 text-sm">
+                                          <Badge variant={machine.status === 'available' ? 'default' : machine.status === 'busy' ? 'secondary' : 'destructive'}>
+                                            {machine.status}
+                                          </Badge>
+                                          <span>Utilization: {machine.currentUtilization}%</span>
+                                        </div>
+                                      </div>
+                                      <Badge variant={isCompatible ? 'default' : 'destructive'} className="whitespace-nowrap">
+                                        {statusText}
+                                      </Badge>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3">
+                                      <div>
+                                        <span className="text-muted-foreground">Handle Type:</span>
+                                        <div className="font-semibold">{machine.handleType}</div>
+                                      </div>
+                                      <div>
+                                        <span className="text-muted-foreground">Max Colors:</span>
+                                        <div className="font-semibold">{machine.maxColors}</div>
+                                      </div>
+                                      <div>
+                                        <span className="text-muted-foreground">Paper Width:</span>
+                                        <div className="font-semibold">{machine.minWidth}-{machine.maxWidth}mm</div>
+                                      </div>
+                                      <div>
+                                        <span className="text-muted-foreground">GSM Range:</span>
+                                        <div className="font-semibold">{machine.minGSM}-{machine.maxGSM}</div>
+                                      </div>
+                                    </div>
+
+                                    {isCompatible && (
+                                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3 p-3 bg-white/50 rounded">
+                                        <div>
+                                          <span className="text-muted-foreground">Daily Capacity:</span>
+                                          <div className="font-semibold">{result.production.adjustedCapacity.toLocaleString()}</div>
+                                        </div>
+                                        <div>
+                                          <span className="text-muted-foreground">Days Required:</span>
+                                          <div className="font-semibold">{result.production.daysRequired}</div>
+                                        </div>
+                                        <div>
+                                          <span className="text-muted-foreground">Hours Required:</span>
+                                          <div className="font-semibold">{result.production.hoursRequired}h</div>
+                                        </div>
+                                        <div>
+                                          <span className="text-muted-foreground">Order Utilization:</span>
+                                          <div className="font-semibold">{result.production.utilization.toFixed(1)}%</div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {!isCompatible && result.compatibility.reasons.length > 0 && (
+                                      <div className="bg-white/50 p-3 rounded">
+                                        <h6 className="font-semibold text-red-700 mb-2">Compatibility Issues:</h6>
+                                        <ul className="text-sm space-y-1">
+                                          {result.compatibility.reasons.map((reason: string, idx: number) => (
+                                            <li key={idx} className="text-red-600">• {reason}</li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                  </CardContent>
+                                </Card>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </TabsContent>
               </Tabs>
