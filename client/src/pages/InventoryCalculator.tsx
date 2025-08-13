@@ -77,6 +77,41 @@ export default function InventoryCalculator() {
   
   const [analysis, setAnalysis] = useState<InventoryAnalysis | null>(null);
   const [activeTab, setActiveTab] = useState('materials');
+  const [stockData, setStockData] = useState<Record<string, number>>({});
+
+  // Fetch stock data from QuickBase API
+  const fetchStockData = async (sapCode: string): Promise<number> => {
+    try {
+      const response = await fetch(`/api/inventory?sapCode=${sapCode}`);
+      if (!response.ok) {
+        return INVENTORY_DATA[sapCode as keyof typeof INVENTORY_DATA]?.currentStock || 0;
+      }
+      const data = await response.json();
+      return data.stock || 0;
+    } catch (error) {
+      // Silently fall back to hardcoded data
+      return INVENTORY_DATA[sapCode as keyof typeof INVENTORY_DATA]?.currentStock || 0;
+    }
+  };
+
+  // Load stock data for all materials
+  useEffect(() => {
+    const loadAllStockData = async () => {
+      const stockPromises = Object.keys(INVENTORY_DATA).map(async (sapCode) => {
+        const stock = await fetchStockData(sapCode);
+        return { sapCode, stock };
+      });
+      
+      const stockResults = await Promise.all(stockPromises);
+      const newStockData: Record<string, number> = {};
+      stockResults.forEach(({ sapCode, stock }) => {
+        newStockData[sapCode] = stock;
+      });
+      setStockData(newStockData);
+    };
+
+    loadAllStockData();
+  }, []);
 
   // Set default delivery date to 2 weeks from now
   useEffect(() => {
@@ -167,7 +202,7 @@ export default function InventoryCalculator() {
       if (!inventoryItem) return;
 
       const required = item.quantity * orderQty;
-      const available = inventoryItem.currentStock;
+      const available = stockData[item.sapCode] ?? inventoryItem.currentStock;
       const shortage = Math.max(0, required - available);
       const cost = required * inventoryItem.price;
       
@@ -251,9 +286,10 @@ export default function InventoryCalculator() {
     };
   };
 
-  const inventoryStats = Object.values(INVENTORY_DATA).reduce((acc, item) => {
-    const stockStatus = getStockStatus(item.currentStock, item.minStock);
-    acc.totalValue += item.currentStock * item.price;
+  const inventoryStats = Object.entries(INVENTORY_DATA).reduce((acc, [sapCode, item]) => {
+    const currentStock = stockData[sapCode] ?? item.currentStock;
+    const stockStatus = getStockStatus(currentStock, item.minStock);
+    acc.totalValue += currentStock * item.price;
     acc.totalItems += 1;
     if (stockStatus.status === 'low') acc.lowStock += 1;
     if (stockStatus.status === 'critical') acc.critical += 1;
@@ -538,8 +574,9 @@ export default function InventoryCalculator() {
                       </thead>
                       <tbody>
                         {Object.entries(INVENTORY_DATA).map(([sapCode, item]) => {
-                          const stockStatus = getStockStatus(item.currentStock, item.minStock);
-                          const stockRatio = item.currentStock / item.minStock;
+                          const currentStock = stockData[sapCode] ?? item.currentStock;
+                          const stockStatus = getStockStatus(currentStock, item.minStock);
+                          const stockRatio = currentStock / item.minStock;
                           const stockPercentage = Math.min(100, stockRatio * 50); // Cap at 100%
                           return (
                             <tr key={sapCode} className={`border-b hover:${stockStatus.bgColor}/30 transition-colors`}>
@@ -551,7 +588,7 @@ export default function InventoryCalculator() {
                               </td>
                               <td className="p-3 font-mono">
                                 <span className={stockStatus.textColor}>
-                                  {item.currentStock.toFixed(item.unit === 'PC' ? 0 : 1)} {item.unit}
+                                  {currentStock.toFixed(item.unit === 'PC' ? 0 : 1)} {item.unit}
                                 </span>
                               </td>
                               <td className="p-3 font-mono text-muted-foreground">
@@ -640,9 +677,10 @@ export default function InventoryCalculator() {
                       Reorder Suggestions
                     </h4>
                     {Object.entries(INVENTORY_DATA)
-                      .filter(([_, item]) => item.currentStock <= item.minStock * 1.5)
+                      .filter(([sapCode, item]) => (stockData[sapCode] ?? item.currentStock) <= item.minStock * 1.5)
                       .map(([sapCode, item]) => {
-                        const stockStatus = getStockStatus(item.currentStock, item.minStock);
+                        const currentStock = stockData[sapCode] ?? item.currentStock;
+                        const stockStatus = getStockStatus(currentStock, item.minStock);
                         const suggestedOrder = (item.minStock * 2).toFixed(item.unit === 'PC' ? 0 : 1);
                         const cost = (parseFloat(suggestedOrder) * item.price).toFixed(2);
                         return (
@@ -656,7 +694,7 @@ export default function InventoryCalculator() {
                                 <div>
                                   <strong className="text-base">{item.name}</strong>
                                   <div className="text-sm mt-1">
-                                    <span className="inline-block mr-4">Current: <span className="font-mono">{item.currentStock.toFixed(item.unit === 'PC' ? 0 : 1)}{item.unit}</span></span>
+                                    <span className="inline-block mr-4">Current: <span className="font-mono">{currentStock.toFixed(item.unit === 'PC' ? 0 : 1)}{item.unit}</span></span>
                                     <span className="inline-block mr-4">Min: <span className="font-mono">{item.minStock.toFixed(item.unit === 'PC' ? 0 : 1)}{item.unit}</span></span>
                                     <span className="inline-block">Lead time: <span className="font-semibold">{item.leadTime} days</span></span>
                                   </div>
@@ -674,7 +712,7 @@ export default function InventoryCalculator() {
                           </Alert>
                         );
                       })}
-                    {Object.entries(INVENTORY_DATA).filter(([_, item]) => item.currentStock <= item.minStock * 1.5).length === 0 && (
+                    {Object.entries(INVENTORY_DATA).filter(([sapCode, item]) => (stockData[sapCode] ?? item.currentStock) <= item.minStock * 1.5).length === 0 && (
                       <Alert className="border-green-200 bg-green-50">
                         <CheckCircle className="h-4 w-4 text-green-600" />
                         <AlertDescription className="text-green-800">
