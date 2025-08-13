@@ -237,18 +237,19 @@ export default function InventoryCalculator() {
   });
   const [machineAnalysis, setMachineAnalysis] = useState<any>(null);
 
-  // Fetch stock data from QuickBase API
+  // Fetch stock data from QuickBase API (no fallback to hardcoded data)
   const fetchStockData = async (sapCode: string): Promise<number> => {
     try {
       const response = await fetch(`/api/inventory?sapCode=${sapCode}`);
       if (!response.ok) {
-        return INVENTORY_DATA[sapCode as keyof typeof INVENTORY_DATA]?.currentStock || 0;
+        console.warn(`Failed to fetch stock for ${sapCode}:`, response.status);
+        return 0;
       }
       const data = await response.json();
       return data.stock || 0;
     } catch (error) {
-      // Silently fall back to hardcoded data
-      return INVENTORY_DATA[sapCode as keyof typeof INVENTORY_DATA]?.currentStock || 0;
+      console.error(`Error fetching stock for ${sapCode}:`, error);
+      return 0;
     }
   };
 
@@ -360,7 +361,7 @@ export default function InventoryCalculator() {
       if (!inventoryItem) return;
 
       const required = item.quantity * orderQty;
-      const available = stockData[item.sapCode] ?? inventoryItem.currentStock;
+      const available = stockData[item.sapCode] ?? 0;
       const shortage = Math.max(0, required - available);
       const cost = required * inventoryItem.price;
       
@@ -564,7 +565,7 @@ export default function InventoryCalculator() {
   };
 
   const inventoryStats = Object.entries(INVENTORY_DATA).reduce((acc, [sapCode, item]) => {
-    const currentStock = stockData[sapCode] ?? item.currentStock;
+    const currentStock = stockData[sapCode] ?? 0;
     const stockStatus = getStockStatus(currentStock, item.minStock);
     acc.totalValue += currentStock * item.price;
     acc.totalItems += 1;
@@ -852,7 +853,7 @@ export default function InventoryCalculator() {
                       </thead>
                       <tbody>
                         {Object.entries(INVENTORY_DATA).map(([sapCode, item]) => {
-                          const currentStock = stockData[sapCode] ?? item.currentStock;
+                          const currentStock = stockData[sapCode] ?? 0;
                           const stockStatus = getStockStatus(currentStock, item.minStock);
                           const stockRatio = currentStock / item.minStock;
                           const stockPercentage = Math.min(100, stockRatio * 50); // Cap at 100%
@@ -955,9 +956,9 @@ export default function InventoryCalculator() {
                       Reorder Suggestions
                     </h4>
                     {Object.entries(INVENTORY_DATA)
-                      .filter(([sapCode, item]) => (stockData[sapCode] ?? item.currentStock) <= item.minStock * 1.5)
+                      .filter(([sapCode, item]) => (stockData[sapCode] ?? 0) <= item.minStock * 1.5)
                       .map(([sapCode, item]) => {
-                        const currentStock = stockData[sapCode] ?? item.currentStock;
+                        const currentStock = stockData[sapCode] ?? 0;
                         const stockStatus = getStockStatus(currentStock, item.minStock);
                         const suggestedOrder = (item.minStock * 2).toFixed(item.unit === 'PC' ? 0 : 1);
                         const cost = (parseFloat(suggestedOrder) * item.price).toFixed(2);
@@ -990,7 +991,7 @@ export default function InventoryCalculator() {
                           </Alert>
                         );
                       })}
-                    {Object.entries(INVENTORY_DATA).filter(([sapCode, item]) => (stockData[sapCode] ?? item.currentStock) <= item.minStock * 1.5).length === 0 && (
+                    {Object.entries(INVENTORY_DATA).filter(([sapCode, item]) => (stockData[sapCode] ?? 0) <= item.minStock * 1.5).length === 0 && (
                       <Alert className="border-green-200 bg-green-50">
                         <CheckCircle className="h-4 w-4 text-green-600" />
                         <AlertDescription className="text-green-800">
