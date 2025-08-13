@@ -535,8 +535,8 @@ export default function InventoryCalculator() {
     }
 
     const machineResults = Object.entries(MACHINES_DATA).map(([machineId, machine]) => {
-      const compatibility = checkMachineCompatibility(machine, machineOrderSpec);
-      const production = calculateMachineProduction(machine, machineOrderSpec);
+      const compatibility = checkMachineCompatibility(machine as MachineData, machineOrderSpec);
+      const production = calculateMachineProduction(machine as MachineData, machineOrderSpec);
       
       return {
         machineId,
