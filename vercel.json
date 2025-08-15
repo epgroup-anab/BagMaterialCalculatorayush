@@ -26,9 +26,4 @@
       "dest": "/dist/public/index.html"
     }
   ],
-  "env": {
-    "QB_REALM_HOSTNAME": "@qb_realm_hostname",
-    "QB_USER_TOKEN": "@qb_user_token", 
-    "QB_TABLE_ID": "@qb_table_id"
-  }
 }
