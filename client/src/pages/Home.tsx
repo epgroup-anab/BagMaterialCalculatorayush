@@ -338,25 +338,25 @@ export default function Home() {
     : (totalMaterialWeight + 0.005);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       {/* Header */}
-      <header className="gradient-primary text-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">
-            <h1 className="text-3xl font-bold mb-2">🧠 Smart Bag Material Calculator</h1>
-            <p className="text-primary-100 text-lg">Automatically calculates raw material requirements based on bag specifications</p>
+      <header className="border-b header-gradient">
+        <div className="container section-padding">
+          <div className="max-w-4xl mx-auto text-center">
+            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl mb-4">Material Calculator</h1>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">Calculate precise raw material requirements for bag production based on specifications and industry standards.</p>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="container section-padding">
         {/* Bag Specification Form */}
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <span>🎯</span>
-              Bag Specifications
-            </CardTitle>
+            <CardTitle>Bag Specifications</CardTitle>
+            <CardDescription>
+              Enter your bag specifications or select an existing SKU to calculate material requirements.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
@@ -511,14 +511,14 @@ export default function Home() {
               </div>
             </div>
             
-            <div className="flex flex-wrap gap-3 pt-4 border-t border-border">
-              <Button onClick={calculateMaterials} className="inline-flex items-center gap-2">
-                <Calculator className="w-4 h-4" />
+            <div className="flex flex-wrap gap-3 pt-6 border-t">
+              <Button onClick={calculateMaterials}>
+                <Calculator className="w-4 h-4 mr-2" />
                 Calculate Materials
               </Button>
-              <Button variant="secondary" onClick={clearForm} className="inline-flex items-center gap-2">
-                <Trash2 className="w-4 h-4" />
-                Clear
+              <Button variant="outline" onClick={clearForm}>
+                <Trash2 className="w-4 h-4 mr-2" />
+                Clear Form
               </Button>
             </div>
           </CardContent>
@@ -528,14 +528,14 @@ export default function Home() {
         {results && (
           <Card className="mb-8">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <span>📊</span>
-                Generated Bill of Materials
-              </CardTitle>
+              <CardTitle>Bill of Materials</CardTitle>
+              <CardDescription>
+                Detailed breakdown of all materials required for production.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {/* Specifications Display */}
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 p-4 bg-muted rounded-lg mb-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 p-4 bg-muted/50 rounded-lg mb-6">
                 {results.isExistingSku && results.specs.sku && (
                   <div className="text-center">
                     <div className="text-xs text-muted-foreground mb-1">SKU</div>
@@ -565,35 +565,35 @@ export default function Home() {
               </div>
 
               {/* BOM Table */}
-              <div className="emerald-bg-50 emerald-border-200 border-2 rounded-lg p-4 mb-6">
+              <div className="border rounded-lg p-6 mb-6 bg-green-50/50 border-green-200">
                 <div className="flex items-center mb-3">
-                  <span className="mr-2">📋</span>
-                  <h4 className="font-semibold emerald-text-800">
-                    {results.isExistingSku ? 'Existing SKU BOM' : 'Auto-Generated BOM'}
+                  <Factory className="h-4 w-4 mr-2 text-green-700" />
+                  <h4 className="font-medium text-green-900">
+                    {results.isExistingSku ? 'Production BOM' : 'Calculated BOM'}
                   </h4>
                 </div>
-                <p className="emerald-text-700 text-sm mb-4">
-                  {results.isExistingSku ? 'Materials from production database:' : 'Materials automatically calculated based on bag specifications:'}
+                <p className="text-sm mb-4 text-green-700">
+                  {results.isExistingSku ? 'Materials from production database' : 'Materials calculated based on specifications'}
                 </p>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="emerald-bg-100">
-                        <th className="px-4 py-3 text-left text-xs font-medium emerald-text-800 uppercase tracking-wider">Material Type</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium emerald-text-800 uppercase tracking-wider">SAP Code</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium emerald-text-800 uppercase tracking-wider">Description</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium emerald-text-800 uppercase tracking-wider">Qty per Bag</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium emerald-text-800 uppercase tracking-wider">Unit</th>
+                      <tr className="bg-muted/50">
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Material Type</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">SAP Code</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Description</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Qty per Bag</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Unit</th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-emerald-200">
+                    <tbody className="bg-card divide-y divide-border">
                       {results.bom.map((item, index) => (
-                        <tr key={index} className="hover:bg-emerald-50 transition-colors">
-                          <td className="px-4 py-3 text-sm font-medium text-slate-900">{item.type}</td>
-                          <td className="px-4 py-3 text-sm text-slate-700 font-mono">{item.sapCode}</td>
-                          <td className="px-4 py-3 text-sm text-slate-700">{item.description}</td>
-                          <td className="px-4 py-3 text-sm text-slate-900 text-right font-mono">{item.quantity.toFixed(6)}</td>
-                          <td className="px-4 py-3 text-sm text-slate-700">{item.unit}</td>
+                        <tr key={index} className="hover:bg-muted/30 transition-colors">
+                          <td className="px-4 py-3 text-sm font-medium">{item.type}</td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground font-mono">{item.sapCode}</td>
+                          <td className="px-4 py-3 text-sm">{item.description}</td>
+                          <td className="px-4 py-3 text-sm text-right font-mono font-medium">{item.quantity.toFixed(6)}</td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">{item.unit}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -602,62 +602,81 @@ export default function Home() {
               </div>
 
               {/* Calculation Steps */}
-              <div className="bg-muted rounded-lg p-4 mb-6">
-                <h4 className="font-semibold text-primary mb-3 flex items-center">
-                  <span className="mr-2">📋</span>
-                  {results.isExistingSku ? 'SKU Information' : 'Calculation Logic'}
+              <div className="bg-muted/50 rounded-lg p-6 mb-6">
+                <h4 className="font-medium mb-4 flex items-center gap-2">
+                  <Weight className="h-4 w-4" />
+                  {results.isExistingSku ? 'SKU Information' : 'Calculation Details'}
                 </h4>
-                <ul className="space-y-1 text-sm text-muted-foreground">
+                <ul className="space-y-2 text-sm text-muted-foreground">
                   {results.steps.map((step, index) => (
-                    <li key={index}>{step}</li>
+                    <li key={index} className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 bg-foreground rounded-full mt-2 flex-shrink-0"></span>
+                      <span>{step}</span>
+                    </li>
                   ))}
                 </ul>
               </div>
               
               {/* Summary Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <div className="gradient-summary-blue text-white p-5 rounded-xl">
-                  <h4 className="text-blue-100 text-sm font-medium">Order Quantity</h4>
-                  <div className="text-2xl font-bold mt-2">{orderQty.toLocaleString()}</div>
-                </div>
-                <div className="gradient-summary-emerald text-white p-5 rounded-xl">
-                  <h4 className="text-emerald-100 text-sm font-medium">Material Weight/Bag</h4>
-                  <div className="text-2xl font-bold mt-2">{totalMaterialWeight.toFixed(6)} kg</div>
-                </div>
-                <div className="gradient-summary-amber text-white p-5 rounded-xl">
-                  <h4 className="text-amber-100 text-sm font-medium">Total Material Weight</h4>
-                  <div className="text-2xl font-bold mt-2">{(totalMaterialWeight * orderQty).toFixed(3)} kg</div>
-                </div>
-                <div className="gradient-summary-purple text-white p-5 rounded-xl">
-                  <h4 className="text-purple-100 text-sm font-medium">Estimated Bag Weight</h4>
-                  <div className="text-2xl font-bold mt-2">{estimatedBagWeight.toFixed(4)} kg</div>
-                </div>
+              <div className="metric-grid mb-8">
+                <Card className="p-6 text-center metric-card-1">
+                  <div className="flex items-center justify-center mb-3">
+                    <Package className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div className="text-2xl font-semibold mb-1 text-blue-900">{orderQty.toLocaleString()}</div>
+                  <h4 className="text-sm font-medium text-blue-700">Order Quantity</h4>
+                  <p className="text-xs text-blue-600/80 mt-1">units</p>
+                </Card>
+                <Card className="p-6 text-center metric-card-2">
+                  <div className="flex items-center justify-center mb-3">
+                    <Weight className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div className="text-2xl font-semibold mb-1 text-green-900">{totalMaterialWeight.toFixed(4)}</div>
+                  <h4 className="text-sm font-medium text-green-700">Material per Bag</h4>
+                  <p className="text-xs text-green-600/80 mt-1">kg</p>
+                </Card>
+                <Card className="p-6 text-center metric-card-3">
+                  <div className="flex items-center justify-center mb-3">
+                    <Factory className="h-5 w-5 text-purple-600" />
+                  </div>
+                  <div className="text-2xl font-semibold mb-1 text-purple-900">{(totalMaterialWeight * orderQty).toFixed(2)}</div>
+                  <h4 className="text-sm font-medium text-purple-700">Total Material Weight</h4>
+                  <p className="text-xs text-purple-600/80 mt-1">kg</p>
+                </Card>
+                <Card className="p-6 text-center metric-card-4">
+                  <div className="flex items-center justify-center mb-3">
+                    <TrendingUp className="h-5 w-5 text-orange-600" />
+                  </div>
+                  <div className="text-2xl font-semibold mb-1 text-orange-900">{estimatedBagWeight.toFixed(4)}</div>
+                  <h4 className="text-sm font-medium text-orange-700">Estimated Bag Weight</h4>
+                  <p className="text-xs text-orange-600/80 mt-1">kg</p>
+                </Card>
               </div>
 
               {/* Detailed Tables */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 <div>
-                  <h3 className="text-lg font-semibold mb-4 flex items-center">
+                  <h3 className="text-lg font-medium mb-4 flex items-center">
                     <Package className="mr-2 w-5 h-5" />
                     Per Bag Requirements
                   </h3>
-                  <div className="overflow-x-auto bg-card border border-border rounded-lg">
+                  <div className="overflow-x-auto rounded-lg border border-border/50">
                     <table className="w-full">
-                      <thead>
-                        <tr className="bg-muted">
-                          <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Material</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">SAP Code</th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Quantity</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Unit</th>
+                      <thead className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-border/60">
+                        <tr>
+                          <th className="px-4 py-3 text-left font-semibold text-slate-700 text-sm tracking-wide">Material</th>
+                          <th className="px-4 py-3 text-left font-semibold text-slate-700 text-sm tracking-wide">SAP Code</th>
+                          <th className="px-4 py-3 text-right font-semibold text-slate-700 text-sm tracking-wide">Quantity</th>
+                          <th className="px-4 py-3 text-left font-semibold text-slate-700 text-sm tracking-wide">Unit</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-border">
+                      <tbody className="divide-y divide-border/30">
                         {results.bom.map((item, index) => (
-                          <tr key={index} className="hover:bg-muted/50 transition-colors">
-                            <td className="px-4 py-3 text-sm font-medium">{item.type}</td>
-                            <td className="px-4 py-3 text-sm font-mono text-muted-foreground">{item.sapCode}</td>
-                            <td className="px-4 py-3 text-sm text-right font-mono">{item.quantity.toFixed(item.unit === 'PC' ? 3 : 6)}</td>
-                            <td className="px-4 py-3 text-sm text-muted-foreground">{item.unit}</td>
+                          <tr key={index} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-4 py-3 text-sm font-medium text-slate-900">{item.type}</td>
+                            <td className="px-4 py-3 text-sm font-mono text-slate-500">{item.sapCode}</td>
+                            <td className="px-4 py-3 text-sm text-right font-mono font-medium text-slate-900">{item.quantity.toFixed(item.unit === 'PC' ? 3 : 6)}</td>
+                            <td className="px-4 py-3 text-sm text-slate-600">{item.unit}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -666,29 +685,29 @@ export default function Home() {
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-semibold mb-4 flex items-center">
+                  <h3 className="text-lg font-medium mb-4 flex items-center">
                     <Factory className="mr-2 w-5 h-5" />
                     Total Order Requirements
                   </h3>
-                  <div className="overflow-x-auto bg-card border border-border rounded-lg">
+                  <div className="overflow-x-auto rounded-lg border border-border/50">
                     <table className="w-full">
-                      <thead>
-                        <tr className="bg-muted">
-                          <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Material</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">SAP Code</th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Qty</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Unit</th>
+                      <thead className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-border/60">
+                        <tr>
+                          <th className="px-4 py-3 text-left font-semibold text-slate-700 text-sm tracking-wide">Material</th>
+                          <th className="px-4 py-3 text-left font-semibold text-slate-700 text-sm tracking-wide">SAP Code</th>
+                          <th className="px-4 py-3 text-right font-semibold text-slate-700 text-sm tracking-wide">Total Qty</th>
+                          <th className="px-4 py-3 text-left font-semibold text-slate-700 text-sm tracking-wide">Unit</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-border">
+                      <tbody className="divide-y divide-border/30">
                         {results.bom.map((item, index) => {
                           const totalQty = item.quantity * orderQty;
                           return (
-                            <tr key={index} className="hover:bg-muted/50 transition-colors">
-                              <td className="px-4 py-3 text-sm font-medium">{item.type}</td>
-                              <td className="px-4 py-3 text-sm font-mono text-muted-foreground">{item.sapCode}</td>
-                              <td className="px-4 py-3 text-sm text-right font-mono">{totalQty.toFixed(item.unit === 'PC' ? 0 : 3)}</td>
-                              <td className="px-4 py-3 text-sm text-muted-foreground">{item.unit}</td>
+                            <tr key={index} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-4 py-3 text-sm font-medium text-slate-900">{item.type}</td>
+                              <td className="px-4 py-3 text-sm font-mono text-slate-500">{item.sapCode}</td>
+                              <td className="px-4 py-3 text-sm text-right font-mono font-medium text-slate-900">{totalQty.toFixed(item.unit === 'PC' ? 0 : 3)}</td>
+                              <td className="px-4 py-3 text-sm text-slate-600">{item.unit}</td>
                             </tr>
                           );
                         })}
@@ -698,12 +717,12 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="emerald-bg-50 emerald-border-200 border rounded-lg p-4">
-                <div className="flex items-center">
-                  <span className="mr-2">✅</span>
-                  <span className="font-semibold emerald-text-800">Smart Calculation Complete!</span>
+              <div className="border rounded-lg p-4 bg-green-50 border-green-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="h-2 w-2 bg-green-500 rounded-full"></div>
+                  <span className="font-medium text-green-900">Calculation Complete</span>
                 </div>
-                <p className="emerald-text-700 text-sm mt-1">All materials and quantities have been automatically calculated based on your bag specifications and industry standards.</p>
+                <p className="text-sm text-green-700">All materials and quantities have been calculated based on specifications and industry standards.</p>
               </div>
             </CardContent>
           </Card>
@@ -711,9 +730,9 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-secondary text-secondary-foreground py-8 mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-sm">&copy; 2024 Smart Bag Material Calculator. Professional material calculation system.</p>
+      <footer className="border-t bg-muted/40 py-8 mt-16">
+        <div className="container text-center">
+          <p className="text-sm text-muted-foreground">&copy; 2024 Bag Material Calculator. Professional material calculation system.</p>
         </div>
       </footer>
     </div>

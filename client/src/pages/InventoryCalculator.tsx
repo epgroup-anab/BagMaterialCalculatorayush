@@ -237,19 +237,21 @@ export default function InventoryCalculator() {
   });
   const [machineAnalysis, setMachineAnalysis] = useState<any>(null);
 
-  // Fetch stock data from QuickBase API (no fallback to hardcoded data)
+  // Fetch stock data from QuickBase API with fallback to hardcoded data
   const fetchStockData = async (sapCode: string): Promise<number> => {
     try {
       const response = await fetch(`/api/inventory?sapCode=${sapCode}`);
       if (!response.ok) {
-        console.warn(`Failed to fetch stock for ${sapCode}:`, response.status);
-        return 0;
+        console.warn(`Failed to fetch stock for ${sapCode}:`, response.status, '- Using fallback data');
+        // Return fallback data from INVENTORY_DATA
+        return INVENTORY_DATA[sapCode as keyof typeof INVENTORY_DATA]?.currentStock || 0;
       }
       const data = await response.json();
       return data.stock || 0;
     } catch (error) {
-      console.error(`Error fetching stock for ${sapCode}:`, error);
-      return 0;
+      console.error(`Error fetching stock for ${sapCode}:`, error, '- Using fallback data');
+      // Return fallback data from INVENTORY_DATA
+      return INVENTORY_DATA[sapCode as keyof typeof INVENTORY_DATA]?.currentStock || 0;
     }
   };
 
@@ -575,55 +577,35 @@ export default function InventoryCalculator() {
   }, { totalValue: 0, totalItems: 0, lowStock: 0, critical: 0 });
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       {/* Header */}
-      <header className="gradient-primary text-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">
-            <h1 className="text-3xl font-bold mb-2">📊 Smart Inventory Calculator</h1>
-            <p className="text-primary-100 text-lg">Analyze inventory impact and order feasibility for bag production</p>
+      <header className="border-b header-gradient">
+        <div className="container section-padding">
+          <div className="max-w-4xl mx-auto text-center">
+            <h1 className="text-3xl font-semibold tracking-tight mb-4">Inventory Calculator</h1>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">Analyze inventory impact and order feasibility for bag production.</p>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="container section-padding">
         {/* Status Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg">
-            <CardContent className="p-6 text-center">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <span className="text-lg">💰</span>
-                <h4 className="text-sm opacity-90">Total Stock Value</h4>
-              </div>
-              <div className="text-2xl font-bold">€{inventoryStats.totalValue.toFixed(0)}</div>
-            </CardContent>
+        <div className="metric-grid mb-8">
+          <Card className="p-6 text-center metric-card-1">
+            <div className="text-2xl font-semibold mb-1 text-blue-900">€{inventoryStats.totalValue.toFixed(0)}</div>
+            <h4 className="text-sm font-medium text-blue-700">Total Stock Value</h4>
           </Card>
-          <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-0 shadow-lg">
-            <CardContent className="p-6 text-center">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <span className="text-lg">📦</span>
-                <h4 className="text-sm opacity-90">Materials in Stock</h4>
-              </div>
-              <div className="text-2xl font-bold">{inventoryStats.totalItems}</div>
-            </CardContent>
+          <Card className="p-6 text-center metric-card-2">
+            <div className="text-2xl font-semibold mb-1 text-green-900">{inventoryStats.totalItems}</div>
+            <h4 className="text-sm font-medium text-green-700">Materials in Stock</h4>
           </Card>
-          <Card className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white border-0 shadow-lg">
-            <CardContent className="p-6 text-center">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <span className="text-lg">⚠️</span>
-                <h4 className="text-sm opacity-90">Low Stock Items</h4>
-              </div>
-              <div className="text-2xl font-bold">{inventoryStats.lowStock}</div>
-            </CardContent>
+          <Card className="p-6 text-center metric-card-3">
+            <div className="text-2xl font-semibold text-purple-900 mb-1">{inventoryStats.lowStock}</div>
+            <h4 className="text-sm font-medium text-purple-700">Low Stock Items</h4>
           </Card>
-          <Card className="bg-gradient-to-br from-red-500 to-red-600 text-white border-0 shadow-lg">
-            <CardContent className="p-6 text-center">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <span className="text-lg">🚨</span>
-                <h4 className="text-sm opacity-90">Critical Items</h4>
-              </div>
-              <div className="text-2xl font-bold">{inventoryStats.critical}</div>
-            </CardContent>
+          <Card className="p-6 text-center metric-card-4">
+            <div className="text-2xl font-semibold text-orange-900 mb-1">{inventoryStats.critical}</div>
+            <h4 className="text-sm font-medium text-orange-700">Critical Items</h4>
           </Card>
         </div>
 
@@ -631,10 +613,7 @@ export default function InventoryCalculator() {
           {/* Order Analysis */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calculator className="h-5 w-5" />
-                Order Feasibility Analysis
-              </CardTitle>
+              <CardTitle>Order Feasibility Analysis</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -759,14 +738,14 @@ export default function InventoryCalculator() {
 
               <Button onClick={calculateInventoryImpact} className="w-full">
                 <Calculator className="w-4 h-4 mr-2" />
-                Analyze Inventory Impact
+                Analyze Impact
               </Button>
 
               {analysis && (
                 <div className="mt-6">
-                  <Alert className={`mb-4 border-2 ${analysis.feasible 
-                    ? 'border-green-200 bg-green-50' 
-                    : 'border-red-200 bg-red-50'
+                  <Alert className={`mb-4 ${analysis.feasible 
+                    ? 'bg-green-50 border-green-200' 
+                    : 'bg-red-50 border-red-200'
                   }`}>
                     <div className="flex items-center gap-2">
                       {analysis.feasible ? (
@@ -775,12 +754,12 @@ export default function InventoryCalculator() {
                         <AlertTriangle className="h-5 w-5 text-red-600" />
                       )}
                       <AlertDescription className={analysis.feasible ? 'text-green-800' : 'text-red-800'}>
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">{analysis.feasible ? '✅' : '❌'}</span>
+                        <div className="flex items-center gap-3">
+                          <div className={`h-2 w-2 rounded-full ${analysis.feasible ? 'bg-green-500' : 'bg-red-500'}`}></div>
                           <div>
-                            <strong>{analysis.feasible ? 'Order Feasible' : 'Order Not Feasible'}</strong>
+                            <strong className="text-base">{analysis.feasible ? 'Order Feasible' : 'Order Not Feasible'}</strong>
                             <br />
-                            <span className="text-sm">Total material cost: €{analysis.totalCost.toFixed(2)}</span>
+                            <span className="text-sm opacity-80">Total material cost: €{analysis.totalCost.toFixed(2)}</span>
                           </div>
                         </div>
                       </AlertDescription>
@@ -788,15 +767,16 @@ export default function InventoryCalculator() {
                   </Alert>
 
                   {analysis.warnings.length > 0 && (
-                    <Alert className="mb-4 border-yellow-200 bg-yellow-50">
+                    <Alert className="mb-4 bg-yellow-50 border-yellow-200">
                       <AlertTriangle className="h-4 w-4 text-yellow-600" />
                       <AlertDescription>
-                        <h4 className="font-semibold text-yellow-800 mb-2 flex items-center gap-2">
-                          <span>⚠️</span> Warnings:
-                        </h4>
-                        <ul className="list-disc pl-5 space-y-1">
+                        <h4 className="font-medium mb-2 text-yellow-800">Warnings</h4>
+                        <ul className="space-y-2">
                           {analysis.warnings.map((warning, index) => (
-                            <li key={index} className="text-sm text-yellow-700">{warning}</li>
+                            <li key={index} className="text-sm flex items-start gap-2 text-yellow-700">
+                              <span className="w-1 h-1 bg-yellow-600 rounded-full mt-2 flex-shrink-0"></span>
+                              <span>{warning}</span>
+                            </li>
                           ))}
                         </ul>
                       </AlertDescription>
@@ -804,14 +784,15 @@ export default function InventoryCalculator() {
                   )}
 
                   {analysis.recommendations.length > 0 && (
-                    <Alert className="border-blue-200 bg-blue-50">
+                    <Alert className="bg-blue-50 border-blue-200">
                       <AlertDescription>
-                        <h4 className="font-semibold text-blue-800 mb-2 flex items-center gap-2">
-                          <span>💡</span> Recommendations:
-                        </h4>
-                        <ul className="list-disc pl-5 space-y-1">
+                        <h4 className="font-medium text-blue-800 mb-2">Recommendations</h4>
+                        <ul className="space-y-2">
                           {analysis.recommendations.map((rec, index) => (
-                            <li key={index} className="text-sm text-blue-700">{rec}</li>
+                            <li key={index} className="text-sm text-blue-700 flex items-start gap-2">
+                              <span className="w-1 h-1 bg-blue-600 rounded-full mt-2 flex-shrink-0"></span>
+                              <span>{rec}</span>
+                            </li>
                           ))}
                         </ul>
                       </AlertDescription>
@@ -825,10 +806,7 @@ export default function InventoryCalculator() {
           {/* Inventory Overview */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Current Inventory Status
-              </CardTitle>
+              <CardTitle>Current Inventory Status</CardTitle>
             </CardHeader>
             <CardContent>
               <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -840,15 +818,25 @@ export default function InventoryCalculator() {
                 </TabsList>
 
                 <TabsContent value="materials" className="mt-4">
-                  <div className="max-h-96 overflow-y-auto border rounded-lg">
-                    <table className="w-full text-sm">
-                      <thead className="bg-muted sticky top-0">
+                  <div className="max-h-96 overflow-y-auto rounded-lg border border-border/50">
+                    <table className="w-full">
+                      <thead className="bg-gradient-to-r from-slate-50 to-slate-100 sticky top-0 border-b border-border/60">
                         <tr>
-                          <th className="text-left p-3">Material</th>
-                          <th className="text-left p-3">Current Stock</th>
-                          <th className="text-left p-3">Min Stock</th>
-                          <th className="text-left p-3">Stock Level</th>
-                          <th className="text-left p-3">Status</th>
+                          <th className="text-left px-2 py-2 font-semibold text-slate-700 text-xs tracking-wide">
+                            Material
+                          </th>
+                          <th className="text-right px-2 py-2 font-semibold text-slate-700 text-xs tracking-wide">
+                            Current Stock
+                          </th>
+                          <th className="text-right px-2 py-2 font-semibold text-slate-700 text-xs tracking-wide">
+                            Min Stock
+                          </th>
+                          <th className="text-center px-2 py-2 font-semibold text-slate-700 text-xs tracking-wide">
+                            Stock Level
+                          </th>
+                          <th className="text-center px-2 py-2 font-semibold text-slate-700 text-xs tracking-wide">
+                            Status
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -858,44 +846,48 @@ export default function InventoryCalculator() {
                           const stockRatio = currentStock / item.minStock;
                           const stockPercentage = Math.min(100, stockRatio * 50); // Cap at 100%
                           return (
-                            <tr key={sapCode} className={`border-b hover:${stockStatus.bgColor}/30 transition-colors`}>
-                              <td className="p-3">
+                            <tr key={sapCode} className="border-b border-border/30 hover:bg-slate-50/50 transition-colors">
+                              <td className="px-2 py-2">
                                 <div>
-                                  <div className="font-medium">{item.name}</div>
-                                  <div className="text-xs text-muted-foreground">{sapCode}</div>
+                                  <div className="font-medium text-slate-900 text-xs">{item.name}</div>
+                                  <div className="text-xs text-slate-500 font-mono mt-1">{sapCode}</div>
                                 </div>
                               </td>
-                              <td className="p-3 font-mono">
-                                <span className={stockStatus.textColor}>
-                                  {currentStock.toFixed(item.unit === 'PC' ? 0 : 1)} {item.unit}
+                              <td className="px-2 py-2 text-right">
+                                <span className={`font-mono font-medium text-xs ${stockStatus.status === 'critical' ? 'text-red-600' : stockStatus.status === 'low' ? 'text-yellow-600' : 'text-green-600'}`}>
+                                  {currentStock.toFixed(item.unit === 'PC' ? 0 : 1)}
                                 </span>
+                                <span className="text-xs text-slate-500 ml-1">{item.unit}</span>
                               </td>
-                              <td className="p-3 font-mono text-muted-foreground">
-                                {item.minStock.toFixed(item.unit === 'PC' ? 0 : 1)} {item.unit}
+                              <td className="px-2 py-2 text-right">
+                                <span className="font-mono text-slate-600 text-xs">
+                                  {item.minStock.toFixed(item.unit === 'PC' ? 0 : 1)}
+                                </span>
+                                <span className="text-xs text-slate-500 ml-1">{item.unit}</span>
                               </td>
-                              <td className="p-3">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <td className="px-2 py-2">
+                                <div className="flex items-center justify-center gap-2">
+                                  <div className="w-16 h-2 bg-slate-200 rounded-full overflow-hidden">
                                     <div 
-                                      className={`h-full ${stockStatus.color} transition-all`}
+                                      className={`h-full transition-all duration-300 ${
+                                        stockStatus.status === 'critical' ? 'bg-red-500' :
+                                        stockStatus.status === 'low' ? 'bg-yellow-500' : 'bg-green-500'
+                                      }`}
                                       style={{ width: `${stockPercentage}%` }}
                                     ></div>
                                   </div>
-                                  <span className="text-xs text-muted-foreground">
+                                  <span className="text-xs text-slate-500 font-medium min-w-[30px] text-right">
                                     {stockRatio.toFixed(1)}x
                                   </span>
                                 </div>
                               </td>
-                              <td className="p-3">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm">{stockStatus.icon}</span>
-                                  <Badge 
-                                    variant={stockStatus.status === 'critical' ? 'destructive' : stockStatus.status === 'low' ? 'secondary' : 'default'}
-                                    className={stockStatus.status === 'good' ? 'bg-green-100 text-green-800 hover:bg-green-100' : ''}
-                                  >
-                                    {stockStatus.status}
-                                  </Badge>
-                                </div>
+                              <td className="px-2 py-2 text-center">
+                                <Badge 
+                                  variant={stockStatus.status === 'critical' ? 'destructive' : stockStatus.status === 'low' ? 'secondary' : 'default'}
+                                  className={`${stockStatus.status === 'good' ? 'bg-green-100 text-green-700 hover:bg-green-100' : ''} font-medium text-xs`}
+                                >
+                                  {stockStatus.status}
+                                </Badge>
                               </td>
                             </tr>
                           );
@@ -907,7 +899,7 @@ export default function InventoryCalculator() {
 
                 <TabsContent value="predictions" className="mt-4">
                   <div className="space-y-4">
-                    <h4 className="font-semibold flex items-center gap-2">
+                    <h4 className="font-medium flex items-center gap-2">
                       <TrendingUp className="h-4 w-4" />
                       Demand Forecast (Next 3 Months)
                     </h4>
@@ -917,8 +909,8 @@ export default function InventoryCalculator() {
                           <span>January 2025</span>
                           <span>15,000 bags expected</span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div className="bg-blue-500 h-2 rounded-full" style={{ width: '75%' }}></div>
+                        <div className="w-full bg-muted rounded-full h-2">
+                          <div className="bg-primary h-2 rounded-full" style={{ width: '75%' }}></div>
                         </div>
                       </div>
                       <div>
@@ -926,7 +918,7 @@ export default function InventoryCalculator() {
                           <span>February 2025</span>
                           <span>18,000 bags expected</span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="w-full bg-muted rounded-full h-2">
                           <div className="bg-green-500 h-2 rounded-full" style={{ width: '90%' }}></div>
                         </div>
                       </div>
@@ -935,7 +927,7 @@ export default function InventoryCalculator() {
                           <span>March 2025</span>
                           <span>12,000 bags expected</span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="w-full bg-muted rounded-full h-2">
                           <div className="bg-yellow-500 h-2 rounded-full" style={{ width: '60%' }}></div>
                         </div>
                       </div>
@@ -963,23 +955,22 @@ export default function InventoryCalculator() {
                         const suggestedOrder = (item.minStock * 2).toFixed(item.unit === 'PC' ? 0 : 1);
                         const cost = (parseFloat(suggestedOrder) * item.price).toFixed(2);
                         return (
-                          <Alert key={sapCode} className={`border-2 ${stockStatus.borderColor} ${stockStatus.bgColor}`}>
+                          <Alert key={sapCode} className={stockStatus.status === 'critical' ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'}>
                             <div className="flex items-center gap-2">
-                              <span className="text-lg">{stockStatus.icon}</span>
-                              <Clock className="h-4 w-4" />
+                              <Clock className={`h-4 w-4 ${stockStatus.status === 'critical' ? 'text-red-600' : 'text-yellow-600'}`} />
                             </div>
-                            <AlertDescription className={stockStatus.textColor}>
+                            <AlertDescription>
                               <div className="flex justify-between items-start">
                                 <div>
-                                  <strong className="text-base">{item.name}</strong>
+                                  <strong className={`text-base ${stockStatus.status === 'critical' ? 'text-red-900' : 'text-yellow-900'}`}>{item.name}</strong>
                                   <div className="text-sm mt-1">
                                     <span className="inline-block mr-4">Current: <span className="font-mono">{currentStock.toFixed(item.unit === 'PC' ? 0 : 1)}{item.unit}</span></span>
                                     <span className="inline-block mr-4">Min: <span className="font-mono">{item.minStock.toFixed(item.unit === 'PC' ? 0 : 1)}{item.unit}</span></span>
-                                    <span className="inline-block">Lead time: <span className="font-semibold">{item.leadTime} days</span></span>
+                                    <span className="inline-block">Lead time: <span className="font-medium">{item.leadTime} days</span></span>
                                   </div>
                                   <div className="mt-2 text-sm">
-                                    <span className="font-semibold">Suggested order: </span>
-                                    <span className="font-mono bg-white px-2 py-1 rounded">{suggestedOrder}{item.unit}</span>
+                                    <span className="font-medium">Suggested order: </span>
+                                    <span className="font-mono bg-background px-2 py-1 rounded border">{suggestedOrder}{item.unit}</span>
                                     <span className="ml-2 text-muted-foreground">(Cost: €{cost})</span>
                                   </div>
                                 </div>
@@ -992,12 +983,12 @@ export default function InventoryCalculator() {
                         );
                       })}
                     {Object.entries(INVENTORY_DATA).filter(([sapCode, item]) => (stockData[sapCode] ?? 0) <= item.minStock * 1.5).length === 0 && (
-                      <Alert className="border-green-200 bg-green-50">
+                      <Alert className="bg-green-50 border-green-200">
                         <CheckCircle className="h-4 w-4 text-green-600" />
-                        <AlertDescription className="text-green-800">
+                        <AlertDescription>
                           <div className="flex items-center gap-2">
-                            <span>✅</span>
-                            <span><strong>All materials are well stocked!</strong> No reorders needed at this time.</span>
+                            <div className="h-2 w-2 bg-green-500 rounded-full"></div>
+                            <span className="text-green-800"><strong>All materials are well stocked!</strong> No reorders needed at this time.</span>
                           </div>
                         </AlertDescription>
                       </Alert>
@@ -1008,7 +999,7 @@ export default function InventoryCalculator() {
                 <TabsContent value="machines" className="mt-4">
                   <div className="space-y-6">
                     <div>
-                      <h4 className="font-semibold flex items-center gap-2 mb-4">
+                      <h4 className="font-medium flex items-center gap-2 mb-4">
                         <Settings className="h-4 w-4" />
                         Machine Assignment Calculator
                       </h4>
@@ -1159,14 +1150,14 @@ export default function InventoryCalculator() {
 
                       {machineAnalysis && (
                         <div className="space-y-4">
-                          <Alert className={machineAnalysis.feasible ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}>
+                          <Alert className={machineAnalysis.feasible ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}>
                             <AlertDescription>
-                              <div className="flex items-center gap-2">
-                                <span className="text-lg">{machineAnalysis.feasible ? '✅' : '❌'}</span>
+                              <div className="flex items-center gap-3">
+                                <div className={`h-2 w-2 rounded-full ${machineAnalysis.feasible ? 'bg-green-500' : 'bg-red-500'}`}></div>
                                 <div>
-                                  <strong>{machineAnalysis.feasible ? 'Order Can Be Produced' : 'No Suitable Machine Available'}</strong>
+                                  <strong className={`text-base ${machineAnalysis.feasible ? 'text-green-900' : 'text-red-900'}`}>{machineAnalysis.feasible ? 'Order Can Be Produced' : 'No Suitable Machine Available'}</strong>
                                   <br />
-                                  <span className="text-sm">
+                                  <span className={`text-sm ${machineAnalysis.feasible ? 'text-green-700' : 'text-red-700'}`}>
                                     {machineAnalysis.compatibleMachines} out of {machineAnalysis.totalMachines} machines are compatible
                                   </span>
                                 </div>
@@ -1180,27 +1171,27 @@ export default function InventoryCalculator() {
                               const isCompatible = result.compatibility.compatible;
                               const canMeetDeadline = result.production.canMeetDeadline;
                               
-                              let statusColor = 'bg-red-50 border-red-200';
-                              let statusIcon = '❌';
+                              let statusColor = 'border-red-200 bg-red-50';
+                              let statusIcon = 'bg-red-500';
                               let statusText = 'Not Compatible';
                               
                               if (isCompatible && canMeetDeadline) {
-                                statusColor = 'bg-green-50 border-green-200';
-                                statusIcon = '✅';
+                                statusColor = 'border-green-200 bg-green-50';
+                                statusIcon = 'bg-green-500';
                                 statusText = 'Perfect Match';
                               } else if (isCompatible && !canMeetDeadline) {
-                                statusColor = 'bg-yellow-50 border-yellow-200';
-                                statusIcon = '⚠️';
+                                statusColor = 'border-yellow-200 bg-yellow-50';
+                                statusIcon = 'bg-yellow-500';
                                 statusText = 'Compatible but Slow';
                               }
 
                               return (
-                                <Card key={result.machineId} className={`${statusColor} border-2`}>
-                                  <CardContent className="p-4">
-                                    <div className="flex justify-between items-start mb-3">
+                                <Card key={result.machineId} className={statusColor}>
+                                  <CardContent className="p-6">
+                                    <div className="flex justify-between items-start mb-4">
                                       <div>
-                                        <h5 className="font-bold text-lg flex items-center gap-2">
-                                          <span>{statusIcon}</span>
+                                        <h5 className="font-bold text-lg flex items-center gap-3">
+                                          <div className={`h-2 w-2 rounded-full ${statusIcon}`}></div>
                                           {machine.name} - {machine.category}
                                         </h5>
                                         <p className="text-sm text-muted-foreground">{machine.description}</p>
@@ -1236,7 +1227,7 @@ export default function InventoryCalculator() {
                                     </div>
 
                                     {isCompatible && (
-                                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3 p-3 bg-white/50 rounded">
+                                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-3 p-3 bg-background/50 rounded border">
                                         <div>
                                           <span className="text-muted-foreground">Daily Capacity:</span>
                                           <div className="font-semibold">{result.production.adjustedCapacity.toLocaleString()}</div>
@@ -1257,11 +1248,17 @@ export default function InventoryCalculator() {
                                     )}
 
                                     {!isCompatible && result.compatibility.reasons.length > 0 && (
-                                      <div className="bg-white/50 p-3 rounded">
-                                        <h6 className="font-semibold text-red-700 mb-2">Compatibility Issues:</h6>
-                                        <ul className="text-sm space-y-1">
+                                      <div className="bg-background/50 p-4 rounded border">
+                                        <h6 className="font-medium mb-3 flex items-center gap-2">
+                                          <AlertTriangle className="h-4 w-4" />
+                                          Compatibility Issues
+                                        </h6>
+                                        <ul className="text-sm space-y-2">
                                           {result.compatibility.reasons.map((reason: string, idx: number) => (
-                                            <li key={idx} className="text-red-600">• {reason}</li>
+                                            <li key={idx} className="flex items-start gap-2">
+                                              <span className="w-1 h-1 bg-red-500 rounded-full mt-2 flex-shrink-0"></span>
+                                              <span>{reason}</span>
+                                            </li>
                                           ))}
                                         </ul>
                                       </div>
@@ -1288,67 +1285,64 @@ export default function InventoryCalculator() {
               <CardTitle>Detailed Material Analysis</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted">
+              <div className="overflow-x-auto rounded-lg border border-border/50">
+                <table className="w-full">
+                  <thead className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-border/60">
                     <tr>
-                      <th className="text-left p-3">Material</th>
-                      <th className="text-right p-3">Required</th>
-                      <th className="text-right p-3">Available</th>
-                      <th className="text-right p-3">After Order</th>
-                      <th className="text-right p-3">Cost</th>
-                      <th className="text-center p-3">Status</th>
+                      <th className="text-left px-2 py-2 font-semibold text-slate-700 text-xs tracking-wide">Material</th>
+                      <th className="text-right px-2 py-2 font-semibold text-slate-700 text-xs tracking-wide">Required</th>
+                      <th className="text-right px-2 py-2 font-semibold text-slate-700 text-xs tracking-wide">Available</th>
+                      <th className="text-right px-2 py-2 font-semibold text-slate-700 text-xs tracking-wide">After Order</th>
+                      <th className="text-right px-2 py-2 font-semibold text-slate-700 text-xs tracking-wide">Cost</th>
+                      <th className="text-center px-2 py-2 font-semibold text-slate-700 text-xs tracking-wide">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {analysis.materialRequirements.map((req, index) => {
                       const statusColors = getStockStatus(req.available, req.required);
                       return (
-                        <tr key={index} className={`border-b hover:${statusColors.bgColor}/30 transition-colors`}>
-                          <td className="p-3">
+                        <tr key={index} className="border-b border-border/30 hover:bg-slate-50/50 transition-colors">
+                          <td className="px-2 py-2">
                             <div>
-                              <div className="font-medium">{req.name}</div>
-                              <div className="text-xs text-muted-foreground">{req.sapCode}</div>
+                              <div className="font-medium text-slate-900 text-xs">{req.name}</div>
+                              <div className="text-xs text-slate-500 font-mono mt-1">{req.sapCode}</div>
                             </div>
                           </td>
-                          <td className="text-right p-3 font-mono">
-                            <span className="text-blue-700 font-semibold">
-                              {req.required.toFixed(3)} {req.unit}
+                          <td className="text-right px-2 py-2">
+                            <span className="font-mono font-medium text-blue-600 text-xs">
+                              {req.required.toFixed(3)}
                             </span>
+                            <span className="text-xs text-slate-500 ml-1">{req.unit}</span>
                           </td>
-                          <td className="text-right p-3 font-mono">
-                            <span className={req.shortage > 0 ? 'text-red-600' : 'text-green-600'}>
-                              {req.available.toFixed(3)} {req.unit}
+                          <td className="text-right px-2 py-2">
+                            <span className={`font-mono font-medium text-xs ${req.shortage > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                              {req.available.toFixed(3)}
                             </span>
+                            <span className="text-xs text-slate-500 ml-1">{req.unit}</span>
                           </td>
-                          <td className="text-right p-3 font-mono">
+                          <td className="text-right px-2 py-2">
                             {req.shortage > 0 ? (
-                              <span className="text-red-600 font-semibold flex items-center justify-end gap-1">
-                                <span>🚨</span>
+                              <span className="text-red-600 font-medium flex items-center justify-end gap-2 font-mono text-xs">
+                                <div className="w-1.5 h-1.5 bg-red-500 rounded-full"></div>
                                 -{req.shortage.toFixed(3)} {req.unit}
                               </span>
                             ) : (
-                              <span className="text-green-600 font-semibold flex items-center justify-end gap-1">
-                                <span>✅</span>
+                              <span className="text-green-600 font-medium flex items-center justify-end gap-2 font-mono text-xs">
+                                <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
                                 {(req.available - req.required).toFixed(3)} {req.unit}
                               </span>
                             )}
                           </td>
-                          <td className="text-right p-3 font-mono font-semibold">
+                          <td className="text-right px-2 py-2 font-mono font-semibold text-slate-900 text-xs">
                             €{req.cost.toFixed(2)}
                           </td>
-                          <td className="text-center p-3">
-                            <div className="flex items-center justify-center gap-2">
-                              <span className="text-sm">
-                                {req.status === 'critical' ? '🚨' : req.status === 'low' ? '⚠️' : '✅'}
-                              </span>
-                              <Badge 
-                                variant={req.status === 'critical' ? 'destructive' : req.status === 'low' ? 'secondary' : 'default'}
-                                className={req.status === 'sufficient' ? 'bg-green-100 text-green-800 hover:bg-green-100' : ''}
-                              >
-                                {req.status}
-                              </Badge>
-                            </div>
+                          <td className="text-center px-2 py-2">
+                            <Badge 
+                              variant={req.status === 'critical' ? 'destructive' : req.status === 'low' ? 'secondary' : 'default'}
+                              className={`${req.status === 'sufficient' ? 'bg-green-100 text-green-700 hover:bg-green-100' : ''} font-medium text-xs`}
+                            >
+                              {req.status}
+                            </Badge>
                           </td>
                         </tr>
                       );

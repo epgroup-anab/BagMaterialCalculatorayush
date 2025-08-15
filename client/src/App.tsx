@@ -13,33 +13,33 @@ function Navigation() {
   const [location] = useLocation();
   
   return (
-    <nav className="bg-card border-b border-border shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex items-center space-x-8">
-            <div className="flex-shrink-0">
-              <h1 className="text-xl font-bold text-primary">Smart Bag Calculator</h1>
-            </div>
-            <div className="flex space-x-4">
-              <Link href="/">
-                <Button 
-                  variant={location === "/" ? "default" : "ghost"} 
-                  className="flex items-center gap-2"
-                >
-                  <Calculator className="h-4 w-4" />
-                  Material Calculator
-                </Button>
-              </Link>
-              <Link href="/inventory">
-                <Button 
-                  variant={location === "/inventory" ? "default" : "ghost"}
-                  className="flex items-center gap-2"
-                >
-                  <Package className="h-4 w-4" />
-                  Inventory Calculator
-                </Button>
-              </Link>
-            </div>
+    <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
+      <div className="container flex h-16 items-center">
+        <div className="flex items-center space-x-4 lg:space-x-6">
+          <div className="flex items-center space-x-2">
+            <Calculator className="h-6 w-6 text-blue-600" />
+            <h1 className="text-lg font-semibold text-slate-800">Bag Calculator</h1>
+          </div>
+          <div className="hidden md:flex items-center space-x-1">
+            <Link href="/">
+              <Button 
+                variant={location === "/" ? "default" : "ghost"} 
+                size="sm"
+                className="h-9 hover:bg-blue-50 hover:text-blue-700"
+              >
+                Material Calculator
+              </Button>
+            </Link>
+            <Link href="/inventory">
+              <Button 
+                variant={location === "/inventory" ? "default" : "ghost"}
+                size="sm"
+                className="h-9 hover:bg-blue-50 hover:text-blue-700"
+              >
+                <Package className="h-4 w-4 mr-2" />
+                Inventory
+              </Button>
+            </Link>
           </div>
         </div>
       </div>

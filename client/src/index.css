@@ -1,88 +1,50 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --background: hsl(210, 20%, 98%);
-  --foreground: hsl(220, 13%, 13%);
-  --card: hsl(0, 0%, 100%);
-  --card-foreground: hsl(220, 13%, 13%);
-  --popover: hsl(0, 0%, 100%);
-  --popover-foreground: hsl(220, 13%, 13%);
-  --primary: hsl(191, 83%, 35%);
-  --primary-foreground: hsl(0, 0%, 100%);
-  --secondary: hsl(210, 40%, 30%);
-  --secondary-foreground: hsl(0, 0%, 100%);
-  --muted: hsl(210, 20%, 97%);
-  --muted-foreground: hsl(220, 9%, 46%);
-  --accent: hsl(210, 40%, 95%);
-  --accent-foreground: hsl(191, 83%, 35%);
-  --destructive: hsl(0, 84%, 60%);
-  --destructive-foreground: hsl(0, 0%, 100%);
-  --border: hsl(217, 32%, 91%);
-  --input: hsl(217, 32%, 97%);
-  --ring: hsl(191, 83%, 35%);
-  --chart-1: hsl(191, 83%, 35%);
-  --chart-2: hsl(159, 100%, 36%);
-  --chart-3: hsl(42, 93%, 56%);
-  --chart-4: hsl(147, 79%, 42%);
-  --chart-5: hsl(341, 75%, 51%);
-  --sidebar: hsl(210, 20%, 98%);
-  --sidebar-foreground: hsl(220, 13%, 13%);
-  --sidebar-primary: hsl(191, 83%, 35%);
-  --sidebar-primary-foreground: hsl(0, 0%, 100%);
-  --sidebar-accent: hsl(210, 40%, 95%);
-  --sidebar-accent-foreground: hsl(191, 83%, 35%);
-  --sidebar-border: hsl(217, 32%, 91%);
-  --sidebar-ring: hsl(191, 83%, 35%);
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-serif: Georgia, serif;
-  --font-mono: Menlo, monospace;
-  --radius: 0.75rem;
-  
-  /* Custom properties for bag calculator */
-  --gradient-primary: linear-gradient(135deg, hsl(191, 83%, 38%) 0%, hsl(191, 83%, 32%) 100%);
-  --gradient-summary-blue: linear-gradient(135deg, hsl(217, 91%, 60%) 0%, hsl(217, 91%, 50%) 100%);
-  --gradient-summary-emerald: linear-gradient(135deg, hsl(160, 84%, 39%) 0%, hsl(160, 84%, 32%) 100%);
-  --gradient-summary-amber: linear-gradient(135deg, hsl(45, 93%, 47%) 0%, hsl(45, 93%, 40%) 100%);
-  --gradient-summary-purple: linear-gradient(135deg, hsl(262, 83%, 58%) 0%, hsl(262, 83%, 48%) 100%);
-  
-  --emerald-50: hsl(152, 81%, 96%);
-  --emerald-100: hsl(149, 80%, 90%);
-  --emerald-200: hsl(152, 76%, 80%);
-  --emerald-700: hsl(160, 84%, 25%);
-  --emerald-800: hsl(161, 90%, 18%);
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --primary: 221.2 83.2% 53.3%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222.2 84% 4.9%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 210 40% 96%;
+  --accent-foreground: 222.2 84% 4.9%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 221.2 83.2% 53.3%;
 }
 
 .dark {
-  --background: hsl(220, 13%, 5%);
-  --foreground: hsl(220, 13%, 91%);
-  --card: hsl(220, 13%, 8%);
-  --card-foreground: hsl(220, 13%, 91%);
-  --popover: hsl(220, 13%, 5%);
-  --popover-foreground: hsl(220, 13%, 91%);
-  --primary: hsl(191, 83%, 35%);
-  --primary-foreground: hsl(0, 0%, 100%);
-  --secondary: hsl(217, 32%, 17%);
-  --secondary-foreground: hsl(220, 13%, 91%);
-  --muted: hsl(223, 47%, 11%);
-  --muted-foreground: hsl(220, 9%, 46%);
-  --accent: hsl(216, 32%, 12%);
-  --accent-foreground: hsl(191, 83%, 35%);
-  --destructive: hsl(0, 84%, 60%);
-  --destructive-foreground: hsl(0, 0%, 100%);
-  --border: hsl(217, 32%, 17%);
-  --input: hsl(217, 32%, 12%);
-  --ring: hsl(191, 83%, 35%);
-  --sidebar: hsl(220, 13%, 8%);
-  --sidebar-foreground: hsl(220, 13%, 91%);
-  --sidebar-primary: hsl(191, 83%, 35%);
-  --sidebar-primary-foreground: hsl(0, 0%, 100%);
-  --sidebar-accent: hsl(216, 32%, 12%);
-  --sidebar-accent-foreground: hsl(191, 83%, 35%);
-  --sidebar-border: hsl(217, 32%, 17%);
-  --sidebar-ring: hsl(191, 83%, 35%);
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 217.2 91.2% 59.8%;
+  --primary-foreground: 222.2 84% 4.9%;
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --ring: 212.7 26.8% 83.9%;
 }
 
 @layer base {
@@ -91,48 +53,49 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
 }
 
 @layer components {
-  .gradient-primary {
-    background: var(--gradient-primary);
+  .container {
+    @apply w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
   }
   
-  .gradient-summary-blue {
-    background: var(--gradient-summary-blue);
+  .section-padding {
+    @apply py-8 lg:py-12;
   }
   
-  .gradient-summary-emerald {
-    background: var(--gradient-summary-emerald);
+  .card-grid {
+    @apply grid gap-6;
   }
   
-  .gradient-summary-amber {
-    background: var(--gradient-summary-amber);
+  .form-grid {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6;
   }
   
-  .gradient-summary-purple {
-    background: var(--gradient-summary-purple);
+  .metric-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6;
   }
   
-  .emerald-bg-50 {
-    background-color: var(--emerald-50);
+  .metric-card-1 {
+    @apply bg-gradient-to-br from-blue-50 to-blue-100/50 border-blue-200/60;
   }
   
-  .emerald-border-200 {
-    border-color: var(--emerald-200);
+  .metric-card-2 {
+    @apply bg-gradient-to-br from-green-50 to-green-100/50 border-green-200/60;
   }
   
-  .emerald-text-700 {
-    color: var(--emerald-700);
+  .metric-card-3 {
+    @apply bg-gradient-to-br from-purple-50 to-purple-100/50 border-purple-200/60;
   }
   
-  .emerald-text-800 {
-    color: var(--emerald-800);
+  .metric-card-4 {
+    @apply bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-200/60;
   }
   
-  .emerald-bg-100 {
-    background-color: var(--emerald-100);
+  .header-gradient {
+    @apply bg-gradient-to-r from-slate-50 via-blue-50/30 to-slate-50;
   }
 }
