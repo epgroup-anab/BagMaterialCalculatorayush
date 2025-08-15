@@ -511,13 +511,20 @@ export default function Home() {
               </div>
             </div>
             
-            <div className="flex flex-wrap gap-3 pt-6 border-t">
-              <Button onClick={calculateMaterials}>
-                <Calculator className="w-4 h-4 mr-2" />
+            <div className="flex flex-wrap gap-4 pt-6 border-t-2 border-gradient-to-r from-blue-200 to-purple-200">
+              <Button 
+                onClick={calculateMaterials}
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform hover:scale-105 transition-all duration-300 border-2 border-blue-300"
+              >
+                <Calculator className="w-5 h-5 mr-2" />
                 Calculate Materials
               </Button>
-              <Button variant="outline" onClick={clearForm}>
-                <Trash2 className="w-4 h-4 mr-2" />
+              <Button 
+                variant="outline" 
+                onClick={clearForm}
+                className="bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 text-red-700 font-bold py-3 px-6 rounded-lg shadow-lg transform hover:scale-105 transition-all duration-300 border-2 border-red-300 hover:border-red-400"
+              >
+                <Trash2 className="w-5 h-5 mr-2" />
                 Clear Form
               </Button>
             </div>
@@ -565,35 +572,35 @@ export default function Home() {
               </div>
 
               {/* BOM Table */}
-              <div className="border rounded-lg p-6 mb-6 bg-green-50/50 border-green-200">
-                <div className="flex items-center mb-3">
-                  <Factory className="h-4 w-4 mr-2 text-green-700" />
-                  <h4 className="font-medium text-green-900">
+              <div className="border-2 rounded-lg p-6 mb-6 bg-gradient-to-br from-green-50 to-emerald-50 border-green-300 shadow-lg">
+                <div className="flex items-center mb-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-4 py-2 rounded-lg">
+                  <Factory className="h-5 w-5 mr-3 text-white" />
+                  <h4 className="font-bold text-lg">
                     {results.isExistingSku ? 'Production BOM' : 'Calculated BOM'}
                   </h4>
                 </div>
-                <p className="text-sm mb-4 text-green-700">
+                <p className="text-sm mb-4 text-green-800 font-medium bg-white/50 p-3 rounded-md">
                   {results.isExistingSku ? 'Materials from production database' : 'Materials calculated based on specifications'}
                 </p>
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full shadow-md rounded-lg overflow-hidden">
                     <thead>
-                      <tr className="bg-muted/50">
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Material Type</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">SAP Code</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Description</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">Qty per Bag</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">Unit</th>
+                      <tr className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white">
+                        <th className="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider">Material Type</th>
+                        <th className="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider">SAP Code</th>
+                        <th className="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider">Description</th>
+                        <th className="px-6 py-4 text-right text-sm font-bold uppercase tracking-wider">Qty per Bag</th>
+                        <th className="px-6 py-4 text-left text-sm font-bold uppercase tracking-wider">Unit</th>
                       </tr>
                     </thead>
-                    <tbody className="bg-card divide-y divide-border">
+                    <tbody className="bg-white divide-y divide-cyan-200">
                       {results.bom.map((item, index) => (
-                        <tr key={index} className="hover:bg-muted/30 transition-colors">
-                          <td className="px-4 py-3 text-sm font-medium">{item.type}</td>
-                          <td className="px-4 py-3 text-sm text-muted-foreground font-mono">{item.sapCode}</td>
-                          <td className="px-4 py-3 text-sm">{item.description}</td>
-                          <td className="px-4 py-3 text-sm text-right font-mono font-medium">{item.quantity.toFixed(6)}</td>
-                          <td className="px-4 py-3 text-sm text-muted-foreground">{item.unit}</td>
+                        <tr key={index} className="hover:bg-gradient-to-r hover:from-cyan-50 hover:to-blue-100 transition-all duration-300 border-b border-cyan-100">
+                          <td className="px-6 py-4 text-sm font-bold text-slate-800 bg-gradient-to-r from-cyan-100 to-sky-200">{item.type}</td>
+                          <td className="px-6 py-4 text-sm font-mono font-medium text-slate-600 bg-blue-50">{item.sapCode}</td>
+                          <td className="px-6 py-4 text-sm text-slate-700">{item.description}</td>
+                          <td className="px-6 py-4 text-sm text-right font-mono font-bold text-slate-800 bg-gradient-to-r from-lime-100 to-emerald-200">{item.quantity.toFixed(6)}</td>
+                          <td className="px-6 py-4 text-sm font-medium text-slate-600">{item.unit}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -619,64 +626,64 @@ export default function Home() {
               
               {/* Summary Cards */}
               <div className="metric-grid mb-8">
-                <Card className="p-6 text-center metric-card-1">
-                  <div className="flex items-center justify-center mb-3">
-                    <Package className="h-5 w-5 text-blue-600" />
+                <Card className="p-6 text-center bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+                  <div className="flex items-center justify-center mb-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white p-3 rounded-full w-16 h-16 mx-auto">
+                    <Package className="h-8 w-8" />
                   </div>
-                  <div className="text-2xl font-semibold mb-1 text-blue-900">{orderQty.toLocaleString()}</div>
-                  <h4 className="text-sm font-medium text-blue-700">Order Quantity</h4>
-                  <p className="text-xs text-blue-600/80 mt-1">units</p>
+                  <div className="text-3xl font-bold mb-2 text-blue-900 bg-white/50 py-2 px-4 rounded-lg">{orderQty.toLocaleString()}</div>
+                  <h4 className="text-lg font-bold text-blue-800 bg-blue-200 py-1 px-3 rounded-full">Order Quantity</h4>
+                  <p className="text-sm text-blue-700 mt-2 font-medium">units</p>
                 </Card>
-                <Card className="p-6 text-center metric-card-2">
-                  <div className="flex items-center justify-center mb-3">
-                    <Weight className="h-5 w-5 text-green-600" />
+                <Card className="p-6 text-center bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-300 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+                  <div className="flex items-center justify-center mb-3 bg-gradient-to-r from-green-600 to-green-700 text-white p-3 rounded-full w-16 h-16 mx-auto">
+                    <Weight className="h-8 w-8" />
                   </div>
-                  <div className="text-2xl font-semibold mb-1 text-green-900">{totalMaterialWeight.toFixed(4)}</div>
-                  <h4 className="text-sm font-medium text-green-700">Material per Bag</h4>
-                  <p className="text-xs text-green-600/80 mt-1">kg</p>
+                  <div className="text-3xl font-bold mb-2 text-green-900 bg-white/50 py-2 px-4 rounded-lg">{totalMaterialWeight.toFixed(4)}</div>
+                  <h4 className="text-lg font-bold text-green-800 bg-green-200 py-1 px-3 rounded-full">Material per Bag</h4>
+                  <p className="text-sm text-green-700 mt-2 font-medium">kg</p>
                 </Card>
-                <Card className="p-6 text-center metric-card-3">
-                  <div className="flex items-center justify-center mb-3">
-                    <Factory className="h-5 w-5 text-purple-600" />
+                <Card className="p-6 text-center bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-300 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+                  <div className="flex items-center justify-center mb-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white p-3 rounded-full w-16 h-16 mx-auto">
+                    <Factory className="h-8 w-8" />
                   </div>
-                  <div className="text-2xl font-semibold mb-1 text-purple-900">{(totalMaterialWeight * orderQty).toFixed(2)}</div>
-                  <h4 className="text-sm font-medium text-purple-700">Total Material Weight</h4>
-                  <p className="text-xs text-purple-600/80 mt-1">kg</p>
+                  <div className="text-3xl font-bold mb-2 text-purple-900 bg-white/50 py-2 px-4 rounded-lg">{(totalMaterialWeight * orderQty).toFixed(2)}</div>
+                  <h4 className="text-lg font-bold text-purple-800 bg-purple-200 py-1 px-3 rounded-full">Total Material Weight</h4>
+                  <p className="text-sm text-purple-700 mt-2 font-medium">kg</p>
                 </Card>
-                <Card className="p-6 text-center metric-card-4">
-                  <div className="flex items-center justify-center mb-3">
-                    <TrendingUp className="h-5 w-5 text-orange-600" />
+                <Card className="p-6 text-center bg-gradient-to-br from-orange-50 to-orange-100 border-2 border-orange-300 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+                  <div className="flex items-center justify-center mb-3 bg-gradient-to-r from-orange-600 to-orange-700 text-white p-3 rounded-full w-16 h-16 mx-auto">
+                    <TrendingUp className="h-8 w-8" />
                   </div>
-                  <div className="text-2xl font-semibold mb-1 text-orange-900">{estimatedBagWeight.toFixed(4)}</div>
-                  <h4 className="text-sm font-medium text-orange-700">Estimated Bag Weight</h4>
-                  <p className="text-xs text-orange-600/80 mt-1">kg</p>
+                  <div className="text-3xl font-bold mb-2 text-orange-900 bg-white/50 py-2 px-4 rounded-lg">{estimatedBagWeight.toFixed(4)}</div>
+                  <h4 className="text-lg font-bold text-orange-800 bg-orange-200 py-1 px-3 rounded-full">Estimated Bag Weight</h4>
+                  <p className="text-sm text-orange-700 mt-2 font-medium">kg</p>
                 </Card>
               </div>
 
               {/* Detailed Tables */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <div>
-                  <h3 className="text-lg font-medium mb-4 flex items-center">
-                    <Package className="mr-2 w-5 h-5" />
-                    Per Bag Requirements
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border-2 border-blue-200 shadow-lg">
+                  <h3 className="text-xl font-bold mb-4 flex items-center bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-3 rounded-lg shadow-md">
+                    <Package className="mr-3 w-6 h-6" />
+                    Materials Per Bag
                   </h3>
-                  <div className="overflow-x-auto rounded-lg border border-border/50">
+                  <div className="overflow-x-auto rounded-lg border-2 border-blue-300 shadow-lg">
                     <table className="w-full">
-                      <thead className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-border/60">
+                      <thead className="bg-gradient-to-r from-cyan-500 to-blue-500">
                         <tr>
-                          <th className="px-4 py-3 text-left font-semibold text-slate-700 text-sm tracking-wide">Material</th>
-                          <th className="px-4 py-3 text-left font-semibold text-slate-700 text-sm tracking-wide">SAP Code</th>
-                          <th className="px-4 py-3 text-right font-semibold text-slate-700 text-sm tracking-wide">Quantity</th>
-                          <th className="px-4 py-3 text-left font-semibold text-slate-700 text-sm tracking-wide">Unit</th>
+                          <th className="px-6 py-4 text-left font-bold text-white text-sm tracking-wide uppercase">Material</th>
+                          <th className="px-6 py-4 text-left font-bold text-white text-sm tracking-wide uppercase">SAP Code</th>
+                          <th className="px-6 py-4 text-right font-bold text-white text-sm tracking-wide uppercase">Quantity</th>
+                          <th className="px-6 py-4 text-left font-bold text-white text-sm tracking-wide uppercase">Unit</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-border/30">
+                      <tbody className="divide-y divide-cyan-200 bg-white">
                         {results.bom.map((item, index) => (
-                          <tr key={index} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="px-4 py-3 text-sm font-medium text-slate-900">{item.type}</td>
-                            <td className="px-4 py-3 text-sm font-mono text-slate-500">{item.sapCode}</td>
-                            <td className="px-4 py-3 text-sm text-right font-mono font-medium text-slate-900">{item.quantity.toFixed(item.unit === 'PC' ? 3 : 6)}</td>
-                            <td className="px-4 py-3 text-sm text-slate-600">{item.unit}</td>
+                          <tr key={index} className="hover:bg-gradient-to-r hover:from-cyan-50 hover:to-sky-100 transition-all duration-300">
+                            <td className="px-6 py-4 text-sm font-bold text-slate-800 bg-gradient-to-r from-cyan-100 to-sky-200">{item.type}</td>
+                            <td className="px-6 py-4 text-sm font-mono font-medium text-slate-600 bg-blue-50">{item.sapCode}</td>
+                            <td className="px-6 py-4 text-sm text-right font-mono font-bold text-slate-800 bg-gradient-to-r from-lime-100 to-emerald-200">{item.quantity.toFixed(item.unit === 'PC' ? 3 : 6)}</td>
+                            <td className="px-6 py-4 text-sm font-medium text-slate-600">{item.unit}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -684,30 +691,30 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div>
-                  <h3 className="text-lg font-medium mb-4 flex items-center">
-                    <Factory className="mr-2 w-5 h-5" />
-                    Total Order Requirements
+                <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl border-2 border-purple-200 shadow-lg">
+                  <h3 className="text-xl font-bold mb-4 flex items-center bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-3 rounded-lg shadow-md">
+                    <Factory className="mr-3 w-6 h-6" />
+                    Factory Total Requirements
                   </h3>
-                  <div className="overflow-x-auto rounded-lg border border-border/50">
+                  <div className="overflow-x-auto rounded-lg border-2 border-purple-300 shadow-lg">
                     <table className="w-full">
-                      <thead className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-border/60">
+                      <thead className="bg-gradient-to-r from-sky-500 to-indigo-600">
                         <tr>
-                          <th className="px-4 py-3 text-left font-semibold text-slate-700 text-sm tracking-wide">Material</th>
-                          <th className="px-4 py-3 text-left font-semibold text-slate-700 text-sm tracking-wide">SAP Code</th>
-                          <th className="px-4 py-3 text-right font-semibold text-slate-700 text-sm tracking-wide">Total Qty</th>
-                          <th className="px-4 py-3 text-left font-semibold text-slate-700 text-sm tracking-wide">Unit</th>
+                          <th className="px-6 py-4 text-left font-bold text-white text-sm tracking-wide uppercase">Material</th>
+                          <th className="px-6 py-4 text-left font-bold text-white text-sm tracking-wide uppercase">SAP Code</th>
+                          <th className="px-6 py-4 text-right font-bold text-white text-sm tracking-wide uppercase">Total Qty</th>
+                          <th className="px-6 py-4 text-left font-bold text-white text-sm tracking-wide uppercase">Unit</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-border/30">
+                      <tbody className="divide-y divide-sky-200 bg-white">
                         {results.bom.map((item, index) => {
                           const totalQty = item.quantity * orderQty;
                           return (
-                            <tr key={index} className="hover:bg-slate-50/50 transition-colors">
-                              <td className="px-4 py-3 text-sm font-medium text-slate-900">{item.type}</td>
-                              <td className="px-4 py-3 text-sm font-mono text-slate-500">{item.sapCode}</td>
-                              <td className="px-4 py-3 text-sm text-right font-mono font-medium text-slate-900">{totalQty.toFixed(item.unit === 'PC' ? 0 : 3)}</td>
-                              <td className="px-4 py-3 text-sm text-slate-600">{item.unit}</td>
+                            <tr key={index} className="hover:bg-gradient-to-r hover:from-sky-50 hover:to-cyan-100 transition-all duration-300">
+                              <td className="px-6 py-4 text-sm font-bold text-slate-800 bg-gradient-to-r from-sky-100 to-cyan-200">{item.type}</td>
+                              <td className="px-6 py-4 text-sm font-mono font-medium text-slate-600 bg-blue-50">{item.sapCode}</td>
+                              <td className="px-6 py-4 text-sm text-right font-mono font-bold text-slate-800 bg-gradient-to-r from-lime-100 to-emerald-200">{totalQty.toFixed(item.unit === 'PC' ? 0 : 3)}</td>
+                              <td className="px-6 py-4 text-sm font-medium text-slate-600">{item.unit}</td>
                             </tr>
                           );
                         })}
@@ -732,7 +739,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t bg-muted/40 py-8 mt-16">
         <div className="container text-center">
-          <p className="text-sm text-muted-foreground">&copy; 2024 Bag Material Calculator. Professional material calculation system.</p>
+          <p className="text-sm text-muted-foreground">&copy; 2025 Bag Material Calculator. Professional material calculation system.</p>
         </div>
       </footer>
     </div>

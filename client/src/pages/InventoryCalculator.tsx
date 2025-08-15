@@ -811,10 +811,10 @@ export default function InventoryCalculator() {
             <CardContent>
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="materials">Materials</TabsTrigger>
-                  <TabsTrigger value="predictions">Forecast</TabsTrigger>
-                  <TabsTrigger value="reorders">Reorders</TabsTrigger>
-                  <TabsTrigger value="machines">🏭 Machines</TabsTrigger>
+                  <TabsTrigger value="materials" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">Materials</TabsTrigger>
+                  <TabsTrigger value="predictions" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">Forecast</TabsTrigger>
+                  <TabsTrigger value="reorders" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">Reorders</TabsTrigger>
+                  <TabsTrigger value="machines" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">🏭 Machines</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="materials" className="mt-4">
