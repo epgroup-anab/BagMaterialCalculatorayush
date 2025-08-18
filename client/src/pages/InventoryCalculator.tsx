@@ -623,7 +623,7 @@ export default function InventoryCalculator() {
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white">
                       <SelectItem value="specs">Enter Specifications</SelectItem>
                       <SelectItem value="existing">Use Existing SKU</SelectItem>
                     </SelectContent>
@@ -637,7 +637,7 @@ export default function InventoryCalculator() {
                       <SelectTrigger>
                         <SelectValue placeholder="Choose SKU..." />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-white">
                         {SKU_DATA.map(item => (
                           <SelectItem key={item.sku} value={item.sku}>
                             {item.sku} - {item.name.substring(0, 30)}...
@@ -713,7 +713,7 @@ export default function InventoryCalculator() {
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-white">
                         <SelectItem value="FLAT HANDLE">Flat Handle</SelectItem>
                         <SelectItem value="TWISTED HANDLE">Twisted Handle</SelectItem>
                         <SelectItem value="SQR BOTTOM">Square Bottom</SelectItem>
@@ -726,7 +726,7 @@ export default function InventoryCalculator() {
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-white">
                         <SelectItem value="VIRGIN">Virgin Kraft</SelectItem>
                         <SelectItem value="RECYCLED">Recycled Kraft</SelectItem>
                         <SelectItem value="FIBREFORM">Fibreform</SelectItem>
@@ -1073,7 +1073,7 @@ export default function InventoryCalculator() {
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="bg-white">
                               <SelectItem value="FLAT HANDLE">Flat Handle</SelectItem>
                               <SelectItem value="TWISTED HANDLE">Twisted Handle</SelectItem>
                               <SelectItem value="none">No Handle</SelectItem>
@@ -1090,7 +1090,7 @@ export default function InventoryCalculator() {
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="bg-white">
                               <SelectItem value="none">No Patch</SelectItem>
                               <SelectItem value="single">Single Patch</SelectItem>
                               <SelectItem value="double">Double Patch</SelectItem>
@@ -1107,7 +1107,7 @@ export default function InventoryCalculator() {
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="bg-white">
                               <SelectItem value="0">0 Colors</SelectItem>
                               <SelectItem value="1">1 Color</SelectItem>
                               <SelectItem value="2">2 Colors</SelectItem>

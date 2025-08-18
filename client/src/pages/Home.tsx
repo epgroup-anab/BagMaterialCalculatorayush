@@ -366,7 +366,7 @@ export default function Home() {
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white">
                     <SelectItem value="specs">Enter Specifications</SelectItem>
                     <SelectItem value="existing">Use Existing SKU</SelectItem>
                   </SelectContent>
@@ -380,7 +380,7 @@ export default function Home() {
                     <SelectTrigger>
                       <SelectValue placeholder="Choose an existing SKU..." />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white">
                       {SKU_DATA.map(item => (
                         <SelectItem key={item.sku} value={item.sku}>
                           {item.sku} - {item.name}
@@ -474,7 +474,7 @@ export default function Home() {
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white">
                       <SelectItem value="FLAT HANDLE">Flat Handle</SelectItem>
                       <SelectItem value="TWISTED HANDLE">Twisted Handle</SelectItem>
                       <SelectItem value="SQR BOTTOM">Square Bottom (No Handle)</SelectItem>
@@ -488,7 +488,7 @@ export default function Home() {
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white">
                       <SelectItem value="VIRGIN">Virgin Kraft</SelectItem>
                       <SelectItem value="RECYCLED">Recycled Kraft</SelectItem>
                       <SelectItem value="FIBREFORM">Fibreform (Heavy Duty)</SelectItem>
@@ -502,7 +502,7 @@ export default function Home() {
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white">
                       <SelectItem value="FSC">FSC</SelectItem>
                       <SelectItem value="PEFC">PEFC</SelectItem>
                     </SelectContent>
