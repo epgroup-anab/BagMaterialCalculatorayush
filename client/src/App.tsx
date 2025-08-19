@@ -4,10 +4,12 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { Calculator, Package } from "lucide-react";
+import { Calculator, Package, Settings } from "lucide-react";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import InventoryCalculator from "@/pages/InventoryCalculator";
+import Machines from "@/pages/Machines";
+import CombinedCalculator from "@/pages/CombinedCalculator";
 
 function Navigation() {
   const [location] = useLocation();
@@ -21,6 +23,16 @@ function Navigation() {
             <h1 className="text-lg font-semibold text-slate-800">Bag Calculator</h1>
           </div>
           <div className="hidden md:flex items-center space-x-1">
+            <Link href="/combined">
+              <Button 
+                variant={location === "/combined" ? "default" : "ghost"} 
+                size="sm"
+                className="h-9 hover:bg-blue-50 hover:text-blue-700"
+              >
+                <Calculator className="h-4 w-4 mr-2" />
+                Complete Analysis
+              </Button>
+            </Link>
             <Link href="/">
               <Button 
                 variant={location === "/" ? "default" : "ghost"} 
@@ -40,6 +52,16 @@ function Navigation() {
                 Inventory
               </Button>
             </Link>
+            <Link href="/machines">
+              <Button 
+                variant={location === "/machines" ? "default" : "ghost"}
+                size="sm"
+                className="h-9 hover:bg-blue-50 hover:text-blue-700"
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Machines
+              </Button>
+            </Link>
           </div>
         </div>
       </div>
@@ -53,7 +75,9 @@ function Router() {
       <Navigation />
       <Switch>
         <Route path="/" component={Home} />
+        <Route path="/combined" component={CombinedCalculator} />
         <Route path="/inventory" component={InventoryCalculator} />
+        <Route path="/machines" component={Machines} />
         <Route component={NotFound} />
       </Switch>
     </>

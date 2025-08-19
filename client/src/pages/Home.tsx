@@ -4,8 +4,168 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calculator, Trash2, Package, Factory, TrendingUp, Weight } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Calculator, Trash2, Package, Factory, TrendingUp, Weight, Settings, Cpu, AlertTriangle, CheckCircle, Clock, RefreshCw } from "lucide-react";
 import { SKU_DATA, type SKUData } from "@/data/skuData";
+
+// Inventory data (current stock levels)
+const INVENTORY_DATA = {
+  // Paper materials
+  "1003696": { name: "Virgin Kraft 80-90 GSM", currentStock: 2500, unit: "KG", minStock: 500, price: 1.2, leadTime: 7 },
+  "1003697": { name: "Virgin Kraft 90 GSM", currentStock: 1800, unit: "KG", minStock: 400, price: 1.25, leadTime: 7 },
+  "1003771": { name: "Virgin Kraft 85 GSM", currentStock: 800, unit: "KG", minStock: 300, price: 1.15, leadTime: 7 },
+  "1003988": { name: "Virgin Kraft 75 GSM", currentStock: 600, unit: "KG", minStock: 200, price: 1.1, leadTime: 7 },
+  "1004016": { name: "Virgin/Recycled Kraft 50 GSM", currentStock: 1200, unit: "KG", minStock: 300, price: 1.0, leadTime: 7 },
+  "1004017": { name: "Recycled Kraft 100 GSM", currentStock: 900, unit: "KG", minStock: 250, price: 1.3, leadTime: 7 },
+  "1004061": { name: "Paper Special Grade", currentStock: 400, unit: "KG", minStock: 150, price: 1.35, leadTime: 10 },
+  
+  // Adhesives
+  "1004557": { name: "Cold Melt Adhesive", currentStock: 150, unit: "KG", minStock: 30, price: 8.5, leadTime: 5 },
+  "1004555": { name: "Hot Melt Adhesive", currentStock: 120, unit: "KG", minStock: 25, price: 9.2, leadTime: 5 },
+  
+  // Handles
+  "1003688": { name: "Flat Paper Handle", currentStock: 80, unit: "KG", minStock: 20, price: 3.5, leadTime: 10 },
+  "1003930": { name: "Flat Paper Handle (Alternative)", currentStock: 65, unit: "KG", minStock: 15, price: 3.2, leadTime: 10 },
+  "1003967": { name: "Twisted Paper Handle", currentStock: 25, unit: "KG", minStock: 10, price: 12.5, leadTime: 14 },
+  
+  // Patches
+  "1003695": { name: "Handle Patch for Flat Handles", currentStock: 30, unit: "KG", minStock: 8, price: 4.8, leadTime: 12 },
+  "1003823": { name: "Handle Patch (Alternative)", currentStock: 22, unit: "KG", minStock: 6, price: 4.5, leadTime: 12 },
+  "1003948": { name: "Handle Patch for Twisted Handles", currentStock: 15, unit: "KG", minStock: 5, price: 5.2, leadTime: 12 },
+  
+  // Cartons
+  "1003530": { name: "Standard Carton Box", currentStock: 2000, unit: "PC", minStock: 500, price: 0.15, leadTime: 3 },
+  "1004232": { name: "Small Carton Box", currentStock: 1500, unit: "PC", minStock: 300, price: 0.12, leadTime: 3 },
+  "1004289": { name: "Medium Carton Box", currentStock: 1000, unit: "PC", minStock: 200, price: 0.18, leadTime: 3 },
+  "1004308": { name: "Large Carton Box", currentStock: 800, unit: "PC", minStock: 150, price: 0.22, leadTime: 3 }
+};
+
+// Machine specifications database
+const MACHINES_DATA = {
+  'M1': {
+    name: 'M1',
+    category: 'GM 5QT FH',
+    description: 'Garant Triumph 5QT',
+    handleType: 'FLAT HANDLE',
+    maxColors: 1,
+    dailyCapacity: 82000,
+    speed: 100,
+    minWidth: 800,
+    maxWidth: 1100,
+    minGSM: 70,
+    maxGSM: 100,
+    status: 'available',
+    currentUtilization: 65
+  },
+  'M2': {
+    name: 'M2',
+    category: 'GM 5QT FH',
+    description: 'Garant Triumph 5QT',
+    handleType: 'FLAT HANDLE',
+    maxColors: 3,
+    dailyCapacity: 82000,
+    speed: 100,
+    minWidth: 800,
+    maxWidth: 1100,
+    minGSM: 70,
+    maxGSM: 100,
+    status: 'busy',
+    currentUtilization: 85
+  },
+  'M3': {
+    name: 'M3',
+    category: 'GM 5QT FH',
+    description: 'Garant Triumph 5QT',
+    handleType: 'FLAT HANDLE',
+    maxColors: 3,
+    dailyCapacity: 82000,
+    speed: 100,
+    minWidth: 800,
+    maxWidth: 1100,
+    minGSM: 70,
+    maxGSM: 100,
+    status: 'available',
+    currentUtilization: 45
+  },
+  'M4': {
+    name: 'M4',
+    category: 'GM 5QT FH',
+    description: 'Garant Triumph 5QT',
+    handleType: 'FLAT HANDLE',
+    maxColors: 1,
+    dailyCapacity: 82000,
+    speed: 100,
+    minWidth: 800,
+    maxWidth: 1100,
+    minGSM: 70,
+    maxGSM: 100,
+    status: 'available',
+    currentUtilization: 30
+  },
+  'M5': {
+    name: 'M5',
+    category: 'GM 5F6 FH',
+    description: 'Garant 5F6',
+    handleType: 'FLAT HANDLE',
+    maxColors: 4,
+    dailyCapacity: 82000,
+    speed: 100,
+    minWidth: 700,
+    maxWidth: 1200,
+    minGSM: 70,
+    maxGSM: 110,
+    supportsPatch: true,
+    status: 'available',
+    currentUtilization: 55
+  },
+  'M6': {
+    name: 'M6',
+    category: 'GM 5F6 TH',
+    description: 'Garant 5F6',
+    handleType: 'TWISTED HANDLE',
+    maxColors: 2,
+    dailyCapacity: 82000,
+    speed: 100,
+    minWidth: 700,
+    maxWidth: 1200,
+    minGSM: 70,
+    maxGSM: 110,
+    status: 'maintenance',
+    currentUtilization: 0
+  },
+  'NL1': {
+    name: 'NL1',
+    category: 'NL FH',
+    description: 'Newlong',
+    handleType: 'FLAT HANDLE',
+    maxColors: 2,
+    dailyCapacity: 65600,
+    speed: 80,
+    minWidth: 750,
+    maxWidth: 1000,
+    minGSM: 75,
+    maxGSM: 95,
+    status: 'available',
+    currentUtilization: 70
+  },
+  'NL2': {
+    name: 'NL2',
+    category: 'NL FH',
+    description: 'Newlong',
+    handleType: 'FLAT HANDLE',
+    maxColors: 2,
+    dailyCapacity: 65600,
+    speed: 80,
+    minWidth: 750,
+    maxWidth: 1000,
+    minGSM: 75,
+    maxGSM: 95,
+    status: 'available',
+    currentUtilization: 40
+  }
+};
 
 const MATERIAL_DATABASE = {
   PAPER: {
