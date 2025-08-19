@@ -476,15 +476,17 @@ export default function Machines() {
                 </div>
               </div>
 
-              <Button 
-                onClick={analyzeMachineAssignment}
-                disabled={!machineOrderSpec.quantity || !machineOrderSpec.deliveryDays}
-                className="w-full mb-6"
-                data-testid="button-analyze-machines"
-              >
-                <Cpu className="h-4 w-4 mr-2" />
-                Analyze Machine Compatibility
-              </Button>
+              <div className="flex flex-wrap gap-4 pt-6 border-t-2 border-gradient-to-r from-blue-200 to-purple-200">
+                <Button 
+                  onClick={analyzeMachineAssignment}
+                  disabled={!machineOrderSpec.quantity || !machineOrderSpec.deliveryDays}
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform hover:scale-105 transition-all duration-300 border-2 border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                  data-testid="button-analyze-machines"
+                >
+                  <Cpu className="h-4 w-4 mr-2" />
+                  Analyze Machine Compatibility
+                </Button>
+              </div>
 
               {machineAnalysis && (
                 <div className="space-y-4">
