@@ -274,10 +274,10 @@ export default function InventoryCalculator() {
     };
     if (ratio <= 2) return { 
       status: 'low' as const, 
-      color: 'bg-yellow-500', 
-      textColor: 'text-yellow-700',
-      bgColor: 'bg-yellow-50',
-      borderColor: 'border-yellow-200',
+      color: 'bg-orange-500', 
+      textColor: 'text-orange-700',
+      bgColor: 'bg-orange-50',
+      borderColor: 'border-orange-200',
       icon: '⚠️'
     };
     return { 
@@ -578,7 +578,7 @@ export default function InventoryCalculator() {
                                 </div>
                               </td>
                               <td className="px-2 py-2 text-right">
-                                <span className={`font-mono font-medium text-xs ${stockStatus.status === 'critical' ? 'text-red-600' : stockStatus.status === 'low' ? 'text-yellow-600' : 'text-green-600'}`}>
+                                <span className={`font-mono font-medium text-xs ${stockStatus.status === 'critical' ? 'text-red-600' : stockStatus.status === 'low' ? 'text-orange-600' : 'text-green-600'}`}>
                                   {currentStock.toFixed(item.unit === 'PC' ? 0 : 1)}
                                 </span>
                                 <span className="text-xs text-slate-500 ml-1">{item.unit}</span>
@@ -595,7 +595,7 @@ export default function InventoryCalculator() {
                                     <div 
                                       className={`h-full transition-all duration-300 ${
                                         stockStatus.status === 'critical' ? 'bg-red-500' :
-                                        stockStatus.status === 'low' ? 'bg-yellow-500' : 'bg-green-500'
+                                        stockStatus.status === 'low' ? 'bg-orange-500' : 'bg-green-500'
                                       }`}
                                       style={{ width: `${stockPercentage}%` }}
                                     ></div>
@@ -607,8 +607,12 @@ export default function InventoryCalculator() {
                               </td>
                               <td className="px-2 py-2 text-center">
                                 <Badge 
-                                  variant={stockStatus.status === 'critical' ? 'destructive' : stockStatus.status === 'low' ? 'secondary' : 'default'}
-                                  className={`${stockStatus.status === 'good' ? 'bg-green-100 text-green-700 hover:bg-green-100' : ''} font-medium text-xs`}
+                                  variant="outline"
+                                  className={`${
+                                    stockStatus.status === 'good' ? 'bg-green-100 text-green-700 hover:bg-green-100 border-green-300' : 
+                                    stockStatus.status === 'low' ? 'bg-orange-100 text-orange-700 hover:bg-orange-100 border-orange-300' :
+                                    stockStatus.status === 'critical' ? 'bg-red-100 text-red-700 hover:bg-red-100 border-red-300' : 'bg-gray-100 text-gray-700'
+                                  } font-medium text-xs`}
                                 >
                                   {stockStatus.status}
                                 </Badge>
@@ -679,14 +683,14 @@ export default function InventoryCalculator() {
                         const suggestedOrder = (item.minStock * 2).toFixed(item.unit === 'PC' ? 0 : 1);
                         const cost = (parseFloat(suggestedOrder) * item.price).toFixed(2);
                         return (
-                          <Alert key={sapCode} className={stockStatus.status === 'critical' ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'}>
+                          <Alert key={sapCode} className={stockStatus.status === 'critical' ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200'}>
                             <div className="flex items-center gap-2">
-                              <Clock className={`h-4 w-4 ${stockStatus.status === 'critical' ? 'text-red-600' : 'text-yellow-600'}`} />
+                              <Clock className={`h-4 w-4 ${stockStatus.status === 'critical' ? 'text-red-600' : 'text-orange-600'}`} />
                             </div>
                             <AlertDescription>
                               <div className="flex justify-between items-start">
                                 <div>
-                                  <strong className={`text-base ${stockStatus.status === 'critical' ? 'text-red-900' : 'text-yellow-900'}`}>{item.name}</strong>
+                                  <strong className={`text-base ${stockStatus.status === 'critical' ? 'text-red-900' : 'text-orange-900'}`}>{item.name}</strong>
                                   <div className="text-sm mt-1">
                                     <span className="inline-block mr-4">Current: <span className="font-mono">{currentStock.toFixed(item.unit === 'PC' ? 0 : 1)}{item.unit}</span></span>
                                     <span className="inline-block mr-4">Min: <span className="font-mono">{item.minStock.toFixed(item.unit === 'PC' ? 0 : 1)}{item.unit}</span></span>
@@ -698,7 +702,13 @@ export default function InventoryCalculator() {
                                     <span className="ml-2 text-muted-foreground">(Cost: €{cost})</span>
                                   </div>
                                 </div>
-                                <Badge variant={stockStatus.status === 'critical' ? 'destructive' : 'secondary'}>
+                                <Badge 
+                                  variant="outline"
+                                  className={`${
+                                    stockStatus.status === 'critical' ? 'bg-red-100 text-red-700 hover:bg-red-100 border-red-300' :
+                                    'bg-orange-100 text-orange-700 hover:bg-orange-100 border-orange-300'
+                                  } font-medium text-xs`}
+                                >
                                   {stockStatus.status.toUpperCase()}
                                 </Badge>
                               </div>
