@@ -239,6 +239,7 @@ export default function Home() {
   const [inputMethod, setInputMethod] = useState<'specs' | 'existing'>('specs');
   const [existingSku, setExistingSku] = useState('');
   const [orderQty, setOrderQty] = useState(1000);
+  const [orderUnit, setOrderUnit] = useState<'bags' | 'cartons'>('cartons');
   const [bagName, setBagName] = useState('');
   const [width, setWidth] = useState<number | ''>('');
   const [gusset, setGusset] = useState<number | ''>('');
@@ -262,9 +263,9 @@ export default function Home() {
       if (selectedSku) {
         const dims = selectedSku.dimensions.split('×');
         setBagName(selectedSku.name);
-        setWidth(parseInt(dims[0]));
-        setGusset(parseInt(dims[1]));
-        setHeight(parseInt(dims[2]));
+        setWidth(parseInt(dims[0]) * 10);
+        setGusset(parseInt(dims[1]) * 10);
+        setHeight(parseInt(dims[2]) * 10);
         setGsm(parseInt(selectedSku.gsm));
         setHandleType(selectedSku.handle_type);
         setPaperGrade(selectedSku.paper_grade);
@@ -273,25 +274,30 @@ export default function Home() {
     }
   }, [existingSku, inputMethod]);
 
+  // Helper function to calculate actual number of bags
+  const calculateActualBags = (qty: number, unit: 'bags' | 'cartons'): number => {
+    return unit === 'cartons' ? qty * 250 : qty;
+  };
+
   const generateBOM = (specs: BagSpecs): { bom: BOMItem[]; steps: string[] } => {
     const bom: BOMItem[] = [];
     const steps: string[] = [];
     
-    // Calculate bag surface area for paper quantity
-    const widthCm = specs.width / 10; // Convert mm to cm
-    const gussetCm = specs.gusset / 10;
-    const heightCm = specs.height / 10;
+    // Calculate bag surface area for paper quantity (all in mm)
+    const widthMm = specs.width;
+    const gussetMm = specs.gusset;
+    const heightMm = specs.height;
     
-    // Calculate paper area (front + back + gusset + bottom + overlap)
-    const frontBack = 2 * (widthCm * heightCm);
-    const gussetArea = 2 * (gussetCm * heightCm);
-    const bottomArea = widthCm * gussetCm;
-    const overlapArea = (widthCm + gussetCm) * 2; // Seam allowance
-    const totalArea = frontBack + gussetArea + bottomArea + overlapArea;
+    // Calculate paper area in mm² (front + back + gusset + bottom + overlap)
+    const frontBack = 2 * (widthMm * heightMm);
+    const gussetArea = 2 * (gussetMm * heightMm);
+    const bottomArea = widthMm * gussetMm;
+    const overlapArea = (widthMm + gussetMm) * 2; // Seam allowance
+    const totalAreaMm2 = frontBack + gussetArea + bottomArea + overlapArea;
     
     // Paper weight calculation
-    const paperWeightPerCm2 = specs.gsm / 1000; // Convert GSM to g/cm²
-    const paperWeight = (totalArea * paperWeightPerCm2) / 1000; // Convert to kg
+    const paperWeightPerMm2 = specs.gsm / 1000000; // Convert GSM to g/mm²
+    const paperWeight = (totalAreaMm2 * paperWeightPerMm2) / 1000; // Convert to kg
     
     // Get paper SAP code
     const paperGradeData = MATERIAL_DATABASE.PAPER[specs.paperGrade as keyof typeof MATERIAL_DATABASE.PAPER];
@@ -306,7 +312,7 @@ export default function Home() {
         quantity: paperWeight,
         unit: "KG"
       });
-      steps.push(`Paper: ${totalArea.toFixed(0)}cm² × ${specs.gsm}g/m² = ${paperWeight.toFixed(6)}kg`);
+      steps.push(`Paper: ${totalAreaMm2.toFixed(0)}mm² × ${specs.gsm}g/m² = ${paperWeight.toFixed(6)}kg`);
     }
 
     // Cold glue (always needed for bag construction)
@@ -427,9 +433,9 @@ export default function Home() {
       specs = {
         name: selectedSku.name,
         sku: selectedSku.sku,
-        width: parseInt(dims[0]),
-        gusset: parseInt(dims[1]), 
-        height: parseInt(dims[2]),
+        width: parseInt(dims[0]) * 10,
+        gusset: parseInt(dims[1]) * 10, 
+        height: parseInt(dims[2]) * 10,
         gsm: parseInt(selectedSku.gsm),
         handleType: selectedSku.handle_type,
         paperGrade: selectedSku.paper_grade,
@@ -483,6 +489,7 @@ export default function Home() {
     setHeight('');
     setGsm('');
     setOrderQty(1000);
+    setOrderUnit('cartons');
     setHandleType('FLAT HANDLE');
     setPaperGrade('VIRGIN');
     setCertification('FSC');
@@ -553,14 +560,31 @@ export default function Home() {
               
               <div className="space-y-2">
                 <Label htmlFor="orderQty">Order Quantity</Label>
-                <Input 
-                  id="orderQty"
-                  type="number" 
-                  placeholder="e.g. 1000" 
-                  min="1" 
-                  value={orderQty}
-                  onChange={(e) => setOrderQty(parseInt(e.target.value) || 0)}
-                />
+                <div className="flex gap-2">
+                  <Input 
+                    id="orderQty"
+                    type="number" 
+                    placeholder="e.g. 1000" 
+                    min="1" 
+                    value={orderQty}
+                    onChange={(e) => setOrderQty(parseInt(e.target.value) || 0)}
+                    className="flex-1"
+                  />
+                  <Select value={orderUnit} onValueChange={(value: 'bags' | 'cartons') => setOrderUnit(value)}>
+                    <SelectTrigger className="w-24">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white">
+                      <SelectItem value="bags">Bags</SelectItem>
+                      <SelectItem value="cartons">Cartons</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {orderUnit === 'cartons' && (
+                  <p className="text-xs text-muted-foreground">
+                    {orderQty} cartons = {calculateActualBags(orderQty, orderUnit).toLocaleString()} bags (250 bags per carton)
+                  </p>
+                )}
               </div>
             </div>
 
@@ -790,9 +814,11 @@ export default function Home() {
                   <div className="flex items-center justify-center mb-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white p-3 rounded-full w-16 h-16 mx-auto">
                     <Package className="h-8 w-8" />
                   </div>
-                  <div className="text-3xl font-bold mb-2 text-blue-900 bg-white/50 py-2 px-4 rounded-lg">{orderQty.toLocaleString()}</div>
+                  <div className="text-3xl font-bold mb-2 text-blue-900 bg-white/50 py-2 px-4 rounded-lg">{calculateActualBags(orderQty, orderUnit).toLocaleString()}</div>
                   <h4 className="text-lg font-bold text-blue-800 bg-blue-200 py-1 px-3 rounded-full">Order Quantity</h4>
-                  <p className="text-sm text-blue-700 mt-2 font-medium">units</p>
+                  <p className="text-sm text-blue-700 mt-2 font-medium">
+                    bags {orderUnit === 'cartons' && `(${orderQty} cartons)`}
+                  </p>
                 </Card>
                 <Card className="p-6 text-center bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-300 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
                   <div className="flex items-center justify-center mb-3 bg-gradient-to-r from-green-600 to-green-700 text-white p-3 rounded-full w-16 h-16 mx-auto">
@@ -806,7 +832,7 @@ export default function Home() {
                   <div className="flex items-center justify-center mb-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white p-3 rounded-full w-16 h-16 mx-auto">
                     <Factory className="h-8 w-8" />
                   </div>
-                  <div className="text-3xl font-bold mb-2 text-purple-900 bg-white/50 py-2 px-4 rounded-lg">{(totalMaterialWeight * orderQty).toFixed(2)}</div>
+                  <div className="text-3xl font-bold mb-2 text-purple-900 bg-white/50 py-2 px-4 rounded-lg">{(totalMaterialWeight * calculateActualBags(orderQty, orderUnit)).toFixed(2)}</div>
                   <h4 className="text-lg font-bold text-purple-800 bg-purple-200 py-1 px-3 rounded-full">Total Material Weight</h4>
                   <p className="text-sm text-purple-700 mt-2 font-medium">kg</p>
                 </Card>

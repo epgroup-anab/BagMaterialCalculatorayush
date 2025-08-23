@@ -258,6 +258,7 @@ export default function CombinedCalculator() {
   const [inputMethod, setInputMethod] = useState<'specs' | 'existing'>('specs');
   const [existingSku, setExistingSku] = useState('');
   const [orderQty, setOrderQty] = useState(1000);
+  const [orderUnit, setOrderUnit] = useState<'bags' | 'cartons'>('cartons');
   const [bagName, setBagName] = useState('');
   const [width, setWidth] = useState<number | ''>('');
   const [gusset, setGusset] = useState<number | ''>('');
@@ -339,9 +340,9 @@ export default function CombinedCalculator() {
       if (selectedSku) {
         const dims = selectedSku.dimensions.split('×');
         setBagName(selectedSku.name);
-        setWidth(parseInt(dims[0]));
-        setGusset(parseInt(dims[1]));
-        setHeight(parseInt(dims[2]));
+        setWidth(parseInt(dims[0]) * 10);
+        setGusset(parseInt(dims[1]) * 10);
+        setHeight(parseInt(dims[2]) * 10);
         setGsm(parseInt(selectedSku.gsm));
         setHandleType(selectedSku.handle_type);
         setPaperGrade(selectedSku.paper_grade);
@@ -350,23 +351,28 @@ export default function CombinedCalculator() {
     }
   }, [existingSku, inputMethod]);
 
+  // Helper function to calculate actual number of bags
+  const calculateActualBags = (qty: number, unit: 'bags' | 'cartons'): number => {
+    return unit === 'cartons' ? qty * 250 : qty;
+  };
+
   // Material calculation logic (from Home.tsx)
   const generateBOM = (specs: BagSpecs): { bom: BOMItem[]; steps: string[] } => {
     const bom: BOMItem[] = [];
     const steps: string[] = [];
     
-    const widthCm = specs.width / 10;
-    const gussetCm = specs.gusset / 10;
-    const heightCm = specs.height / 10;
+    const widthMm = specs.width;
+    const gussetMm = specs.gusset;
+    const heightMm = specs.height;
     
-    const frontBack = 2 * (widthCm * heightCm);
-    const gussetArea = 2 * (gussetCm * heightCm);
-    const bottomArea = widthCm * gussetCm;
-    const overlapArea = (widthCm + gussetCm) * 2;
-    const totalArea = frontBack + gussetArea + bottomArea + overlapArea;
+    const frontBack = 2 * (widthMm * heightMm);
+    const gussetArea = 2 * (gussetMm * heightMm);
+    const bottomArea = widthMm * gussetMm;
+    const overlapArea = (widthMm + gussetMm) * 2;
+    const totalAreaMm2 = frontBack + gussetArea + bottomArea + overlapArea;
     
-    const paperWeightPerCm2 = specs.gsm / 1000;
-    const paperWeight = (totalArea * paperWeightPerCm2) / 1000;
+    const paperWeightPerMm2 = specs.gsm / 1000000;
+    const paperWeight = (totalAreaMm2 * paperWeightPerMm2) / 1000;
     
     const paperGradeData = MATERIAL_DATABASE.PAPER[specs.paperGrade as keyof typeof MATERIAL_DATABASE.PAPER];
     const gsmStr = specs.gsm.toString();
@@ -380,7 +386,7 @@ export default function CombinedCalculator() {
         quantity: paperWeight,
         unit: "KG"
       });
-      steps.push(`Paper: ${totalArea.toFixed(0)}cm² × ${specs.gsm}g/m² = ${paperWeight.toFixed(6)}kg`);
+      steps.push(`Paper: ${totalAreaMm2.toFixed(0)}mm² × ${specs.gsm}g/m² = ${paperWeight.toFixed(6)}kg`);
     }
 
     const coldGlueQty = 0.0018;
@@ -471,6 +477,7 @@ export default function CombinedCalculator() {
 
   // Inventory analysis logic (from InventoryCalculator.tsx)
   const calculateInventoryImpact = (bomItems: BOMItem[]) => {
+    const actualBags = calculateActualBags(orderQty, orderUnit);
     const materialRequirements: MaterialRequirement[] = [];
     let totalCost = 0;
     let feasible = true;
@@ -481,7 +488,7 @@ export default function CombinedCalculator() {
       const inventoryItem = INVENTORY_DATA[item.sapCode as keyof typeof INVENTORY_DATA];
       if (!inventoryItem) return;
 
-      const required = item.quantity * orderQty;
+      const required = item.quantity * actualBags;
       const available = stockData[item.sapCode] ?? 0;
       const shortage = Math.max(0, required - available);
       const cost = required * inventoryItem.price;
@@ -523,11 +530,12 @@ export default function CombinedCalculator() {
 
   // Machine analysis logic (from Machines.tsx)
   const analyzeMachines = () => {
+    const actualBags = calculateActualBags(orderQty, orderUnit);
     const machineResults = Object.entries(MACHINES_DATA).map(([machineId, machine]) => {
       const compatibility = checkMachineCompatibility(machine as any, {
         handleType,
         colors,
-        paperWidth: width ? Number(width) + Number(gusset) : 0,
+        paperWidth: width ? (Number(width) + Number(gusset)) * 2 + 3 : 0,
         paperGSM: gsm,
         patchType: 'none'
       });
@@ -535,7 +543,7 @@ export default function CombinedCalculator() {
       const production = calculateMachineProduction(machine as any, {
         colors,
         patchType: 'none',
-        quantity: orderQty.toString(),
+        quantity: actualBags.toString(),
         deliveryDays: deliveryDays.toString()
       });
       
@@ -659,9 +667,9 @@ export default function CombinedCalculator() {
       specs = {
         name: selectedSku.name,
         sku: selectedSku.sku,
-        width: parseInt(dims[0]),
-        gusset: parseInt(dims[1]), 
-        height: parseInt(dims[2]),
+        width: parseInt(dims[0]) * 10,
+        gusset: parseInt(dims[1]) * 10, 
+        height: parseInt(dims[2]) * 10,
         gsm: parseInt(selectedSku.gsm),
         handleType: selectedSku.handle_type,
         paperGrade: selectedSku.paper_grade,
@@ -715,6 +723,7 @@ export default function CombinedCalculator() {
     setHeight('');
     setGsm('');
     setOrderQty(1000);
+    setOrderUnit('cartons');
     setHandleType('FLAT HANDLE');
     setPaperGrade('VIRGIN');
     setCertification('FSC');
@@ -791,14 +800,31 @@ export default function CombinedCalculator() {
               
               <div className="space-y-2">
                 <Label htmlFor="orderQty">Order Quantity</Label>
-                <Input 
-                  id="orderQty"
-                  type="number" 
-                  placeholder="e.g. 1000" 
-                  min="1" 
-                  value={orderQty}
-                  onChange={(e) => setOrderQty(parseInt(e.target.value) || 0)}
-                />
+                <div className="flex gap-2">
+                  <Input 
+                    id="orderQty"
+                    type="number" 
+                    placeholder="e.g. 1000" 
+                    min="1" 
+                    value={orderQty}
+                    onChange={(e) => setOrderQty(parseInt(e.target.value) || 0)}
+                    className="flex-1"
+                  />
+                  <Select value={orderUnit} onValueChange={(value: 'bags' | 'cartons') => setOrderUnit(value)}>
+                    <SelectTrigger className="w-24">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white">
+                      <SelectItem value="bags">Bags</SelectItem>
+                      <SelectItem value="cartons">Cartons</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {orderUnit === 'cartons' && (
+                  <p className="text-xs text-muted-foreground">
+                    {orderQty} cartons = {calculateActualBags(orderQty, orderUnit).toLocaleString()} bags (250 bags per carton)
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -1024,7 +1050,10 @@ export default function CombinedCalculator() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     <div>
                       <span className="text-muted-foreground">Order Quantity:</span>
-                      <div className="font-bold">{orderQty.toLocaleString()} bags</div>
+                      <div className="font-bold">
+                        {calculateActualBags(orderQty, orderUnit).toLocaleString()} bags
+                        {orderUnit === 'cartons' && <span className="text-sm text-muted-foreground ml-1">({orderQty} cartons)</span>}
+                      </div>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Total Cost:</span>
@@ -1089,9 +1118,11 @@ export default function CombinedCalculator() {
                     <div className="flex items-center justify-center mb-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white p-3 rounded-full w-16 h-16 mx-auto">
                       <Package className="h-8 w-8" />
                     </div>
-                    <div className="text-3xl font-bold mb-2 text-blue-900 bg-white/50 py-2 px-4 rounded-lg">{orderQty.toLocaleString()}</div>
+                    <div className="text-3xl font-bold mb-2 text-blue-900 bg-white/50 py-2 px-4 rounded-lg">{calculateActualBags(orderQty, orderUnit).toLocaleString()}</div>
                     <h4 className="text-lg font-bold text-blue-800 bg-blue-200 py-1 px-3 rounded-full">Order Quantity</h4>
-                    <p className="text-sm text-blue-700 mt-2 font-medium">units</p>
+                    <p className="text-sm text-blue-700 mt-2 font-medium">
+                      bags {orderUnit === 'cartons' && `(${orderQty} cartons)`}
+                    </p>
                   </Card>
                   <Card className="p-6 text-center bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-300 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
                     <div className="flex items-center justify-center mb-3 bg-gradient-to-r from-green-600 to-green-700 text-white p-3 rounded-full w-16 h-16 mx-auto">
@@ -1105,7 +1136,7 @@ export default function CombinedCalculator() {
                     <div className="flex items-center justify-center mb-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white p-3 rounded-full w-16 h-16 mx-auto">
                       <Factory className="h-8 w-8" />
                     </div>
-                    <div className="text-3xl font-bold mb-2 text-purple-900 bg-white/50 py-2 px-4 rounded-lg">{(totalMaterialWeight * orderQty).toFixed(2)}</div>
+                    <div className="text-3xl font-bold mb-2 text-purple-900 bg-white/50 py-2 px-4 rounded-lg">{(totalMaterialWeight * calculateActualBags(orderQty, orderUnit)).toFixed(2)}</div>
                     <h4 className="text-lg font-bold text-purple-800 bg-purple-200 py-1 px-3 rounded-full">Total Material Weight</h4>
                     <p className="text-sm text-purple-700 mt-2 font-medium">kg</p>
                   </Card>
@@ -1150,7 +1181,7 @@ export default function CombinedCalculator() {
                             <td className="px-6 py-4 text-sm text-slate-700">{item.description}</td>
                             <td className="px-6 py-4 text-sm text-right font-mono font-bold text-slate-800 bg-gradient-to-r from-lime-100 to-emerald-200">{item.quantity.toFixed(6)}</td>
                             <td className="px-6 py-4 text-sm text-right font-mono font-bold text-slate-800 bg-gradient-to-r from-yellow-100 to-amber-200">
-                              {(item.quantity * orderQty).toFixed(item.unit === 'PC' ? 0 : 3)}
+                              {(item.quantity * calculateActualBags(orderQty, orderUnit)).toFixed(item.unit === 'PC' ? 0 : 3)}
                             </td>
                             <td className="px-6 py-4 text-sm font-medium text-slate-600">{item.unit}</td>
                           </tr>

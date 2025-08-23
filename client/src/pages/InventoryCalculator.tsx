@@ -66,6 +66,7 @@ export default function InventoryCalculator() {
   const [inputMethod, setInputMethod] = useState<'specs' | 'existing'>('existing');
   const [existingSku, setExistingSku] = useState('');
   const [orderQty, setOrderQty] = useState(5000);
+  const [orderUnit, setOrderUnit] = useState<'bags' | 'cartons'>('cartons');
   const [deliveryDate, setDeliveryDate] = useState('');
   
   // Custom specs
@@ -130,9 +131,9 @@ export default function InventoryCalculator() {
       const selectedSku = SKU_DATA.find(item => item.sku === existingSku);
       if (selectedSku) {
         const dims = selectedSku.dimensions.split('×');
-        setWidth(parseInt(dims[0]));
-        setGusset(parseInt(dims[1]));
-        setHeight(parseInt(dims[2]));
+        setWidth(parseInt(dims[0]) * 10);
+        setGusset(parseInt(dims[1]) * 10);
+        setHeight(parseInt(dims[2]) * 10);
         setGsm(parseInt(selectedSku.gsm));
         setHandleType(selectedSku.handle_type);
         setPaperGrade(selectedSku.paper_grade);
@@ -140,12 +141,18 @@ export default function InventoryCalculator() {
     }
   }, [existingSku, inputMethod]);
 
+  // Helper function to calculate actual number of bags
+  const calculateActualBags = (qty: number, unit: 'bags' | 'cartons'): number => {
+    return unit === 'cartons' ? qty * 250 : qty;
+  };
+
   const calculateInventoryImpact = () => {
     if (!orderQty || orderQty <= 0) {
       alert('Please enter a valid order quantity');
       return;
     }
 
+    const actualBags = calculateActualBags(orderQty, orderUnit);
     let bomItems: Array<{ type: string; sapCode: string; quantity: number; unit: string; }> = [];
     
     if (inputMethod === 'existing' && existingSku) {
@@ -165,12 +172,12 @@ export default function InventoryCalculator() {
         return;
       }
       
-      // Calculate paper requirement
-      const widthCm = Number(width) / 10;
-      const gussetCm = Number(gusset) / 10;
-      const heightCm = Number(height) / 10;
-      const totalArea = 2 * (widthCm * heightCm) + 2 * (gussetCm * heightCm) + (widthCm * gussetCm) + (widthCm + gussetCm) * 2;
-      const paperWeight = (totalArea * Number(gsm)) / 1000000; // Convert to kg
+      // Calculate paper requirement (all in mm)
+      const widthMm = Number(width);
+      const gussetMm = Number(gusset);
+      const heightMm = Number(height);
+      const totalAreaMm2 = 2 * (widthMm * heightMm) + 2 * (gussetMm * heightMm) + (widthMm * gussetMm) + (widthMm + gussetMm) * 2;
+      const paperWeight = (totalAreaMm2 * Number(gsm) / 1000000) / 1000; // Convert to kg (mm² × g/m² to kg)
       
       bomItems = [
         { type: "PAPER", sapCode: "1003696", quantity: paperWeight, unit: "KG" },
@@ -205,7 +212,7 @@ export default function InventoryCalculator() {
       const inventoryItem = INVENTORY_DATA[item.sapCode as keyof typeof INVENTORY_DATA];
       if (!inventoryItem) return;
 
-      const required = item.quantity * orderQty;
+      const required = item.quantity * actualBags;
       const available = stockData[item.sapCode] ?? 0;
       const shortage = Math.max(0, required - available);
       const cost = required * inventoryItem.price;
