@@ -1,0 +1,8 @@
+bagName,orderQty,orderUnit,width,gusset,height,gsm,handleType,paperGrade,certification,deliveryDays,colors
+Custom Kraft Bag,1000,cartons,320,160,380,90,FLAT HANDLE,VIRGIN,FSC,14,1
+Shopping Bag Premium,500,cartons,280,140,350,80,FLAT HANDLE,RECYCLED,PEFC,21,2
+Gift Bag Luxury,250,bags,200,120,300,100,TWISTED HANDLE,VIRGIN,FSC,10,3
+Grocery Bag Standard,750,cartons,350,180,400,85,FLAT HANDLE,VIRGIN,FSC,18,0
+Boutique Bag Small,200,cartons,180,100,250,75,FLAT HANDLE,RECYCLED,FSC,12,2
+Market Bag Large,400,cartons,400,200,450,95,FLAT HANDLE,VIRGIN,PEFC,20,1
+Wine Bag Special,150,bags,120,80,350,120,TWISTED HANDLE,VIRGIN,FSC,15,4

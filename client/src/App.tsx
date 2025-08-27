@@ -4,12 +4,13 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { Calculator, Package, Settings } from "lucide-react";
+import { Calculator, Package, Settings, Upload } from "lucide-react";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import InventoryCalculator from "@/pages/InventoryCalculator";
 import Machines from "@/pages/Machines";
 import CombinedCalculator from "@/pages/CombinedCalculator";
+import BulkUpload from "@/pages/BulkUpload";
 
 function Navigation() {
   const [location] = useLocation();
@@ -62,6 +63,16 @@ function Navigation() {
                 Machines
               </Button>
             </Link>
+            <Link href="/bulk-upload">
+              <Button 
+                variant={location === "/bulk-upload" ? "default" : "ghost"}
+                size="sm"
+                className="h-9 hover:bg-blue-50 hover:text-blue-700"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Bulk Upload
+              </Button>
+            </Link>
           </div>
         </div>
       </div>
@@ -78,6 +89,7 @@ function Router() {
         <Route path="/combined" component={CombinedCalculator} />
         <Route path="/inventory" component={InventoryCalculator} />
         <Route path="/machines" component={Machines} />
+        <Route path="/bulk-upload" component={BulkUpload} />
         <Route component={NotFound} />
       </Switch>
     </>
