@@ -4,7 +4,9 @@
       "Bash(npm run build:*)",
       "Bash(npm run dev:*)",
       "Bash(npm install:*)",
-      "Bash(npm run check:*)"
+      "Bash(npm run check:*)",
+      "Bash(del test-sequential-orders.csv)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }
