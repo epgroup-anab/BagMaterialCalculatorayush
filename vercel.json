@@ -18,6 +18,18 @@
       "dest": "/api/bulk-upload.ts"
     },
     {
+      "src": "/api/bulk-orders/([^/]+)/export/html",
+      "dest": "/api/bulk-orders/[id]/export/html.ts?id=$1"
+    },
+    {
+      "src": "/api/bulk-orders/([^/]+)/export/pdf",
+      "dest": "/api/bulk-orders/[id]/export/pdf.ts?id=$1"
+    },
+    {
+      "src": "/api/bulk-orders/([^/]+)",
+      "dest": "/api/bulk-orders/[id].ts?id=$1"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/index.ts"
     },
