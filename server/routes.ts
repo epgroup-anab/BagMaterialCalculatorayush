@@ -7,23 +7,17 @@ import * as XLSX from "xlsx";
 import puppeteer from "puppeteer";
 import { z } from "zod";
 
-// Extend Express Request type for file uploads
 interface MulterRequest extends Request {
   file?: Express.Multer.File;
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // put application routes here
-  // prefix all routes with /api
 
-  // use storage to perform CRUD operations on the storage interface
-  // e.g. storage.insertUser(user) or storage.getUserByUsername(username)
 
-  // Configure multer for file uploads
   const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
-      fileSize: 10 * 1024 * 1024, // 10MB limit
+      fileSize: 10 * 1024 * 1024,
     },
     fileFilter: (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
       if (file.mimetype === 'text/csv' || 
@@ -36,7 +30,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Bulk order upload endpoint
   app.post('/api/bulk-upload', upload.single('file'), async (req: MulterRequest, res) => {
     try {
       if (!req.file) {
@@ -46,7 +39,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let parsedData: any[] = [];
       const fileExtension = req.file.originalname.split('.').pop()?.toLowerCase();
 
-      // Parse file based on type
       if (fileExtension === 'csv') {
         parsedData = await parseCSV(req.file.buffer);
       } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
@@ -55,14 +47,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Unsupported file format' });
       }
 
-      // Validate and process data
       const validatedOrders = validateOrderData(parsedData);
       
-      // Calculate all orders using NEW sequential processing logic
-      console.log('🚀 Starting sequential inventory and machine planning...');
       const { results: calculatedOrders, summary } = await processOrdersWithSequentialInventory(validatedOrders);
       
-      // Save to database with enhanced data
       const bulkOrder = await storage.insertBulkOrder({
         fileName: req.file.originalname,
         totalOrders: summary.totalOrders,
@@ -92,7 +80,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get bulk order results
   app.get('/api/bulk-orders/:id', async (req, res) => {
     try {
       const bulkOrder = await storage.getBulkOrder(req.params.id);
@@ -106,7 +93,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // View HTML Report (no download)
   app.get('/api/bulk-orders/:id/export/html', async (req, res) => {
     try {
       const bulkOrder = await storage.getBulkOrder(req.params.id);
@@ -124,7 +110,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Export to PDF
   app.get('/api/bulk-orders/:id/export/pdf', async (req, res) => {
     try {
       const bulkOrder = await storage.getBulkOrder(req.params.id);
@@ -195,11 +180,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ sapCode, stock });
     } catch (error) {
       console.error('Error fetching inventory from QuickBase:', error);
-      console.error('Environment variables:', {
-        QB_REALM_HOSTNAME: !!process.env.QB_REALM_HOSTNAME,
-        QB_USER_TOKEN: !!process.env.QB_USER_TOKEN,
-        QB_TABLE_ID: !!process.env.QB_TABLE_ID
-      });
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       res.status(500).json({ error: "Failed to fetch inventory data", details: errorMessage });
     }

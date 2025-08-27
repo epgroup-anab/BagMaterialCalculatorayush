@@ -7,7 +7,8 @@
       "Bash(npm run check:*)",
       "Bash(del test-sequential-orders.csv)",
       "Bash(rm:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(find:*)"
     ],
     "deny": []
   }

@@ -1,7 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import mongoose, { Document, Schema } from 'mongoose';
 
-// Define models inline for serverless compatibility
 interface IBulkOrder extends Document {
   _id: string;
   fileName: string;
@@ -23,7 +22,6 @@ const BulkOrderSchema = new Schema<IBulkOrder>({
 
 const ServerlessBulkOrder = mongoose.models.ServerlessBulkOrder || mongoose.model<IBulkOrder>('ServerlessBulkOrder', BulkOrderSchema);
 
-// MongoDB connection for serverless
 let isConnected = false;
 
 const connectToDatabase = async () => {
@@ -44,7 +42,6 @@ const connectToDatabase = async () => {
   }
 };
 
-// Storage interface for serverless
 class ServerlessStorage {
   async getBulkOrder(id: string) {
     await connectToDatabase();
@@ -67,7 +64,6 @@ class ServerlessStorage {
 const storage = new ServerlessStorage();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Handle CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');

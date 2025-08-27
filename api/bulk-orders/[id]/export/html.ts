@@ -1,7 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import mongoose, { Document, Schema } from 'mongoose';
 
-// Define models inline for serverless compatibility
 interface IBulkOrder extends Document {
   _id: string;
   fileName: string;
@@ -23,7 +22,6 @@ const BulkOrderSchema = new Schema<IBulkOrder>({
 
 const ServerlessBulkOrder = mongoose.models.ServerlessBulkOrder || mongoose.model<IBulkOrder>('ServerlessBulkOrder', BulkOrderSchema);
 
-// MongoDB connection for serverless
 let isConnected = false;
 
 const connectToDatabase = async () => {
@@ -44,7 +42,6 @@ const connectToDatabase = async () => {
   }
 };
 
-// Storage interface for serverless
 class ServerlessStorage {
   async getBulkOrder(id: string) {
     await connectToDatabase();
@@ -57,7 +54,7 @@ class ServerlessStorage {
       fileName: bulkOrder.fileName,
       totalOrders: bulkOrder.totalOrders,
       totalCost: bulkOrder.totalCost.toString(),
-      orders: bulkOrder.orders, // Return as array, not JSON string
+      orders: bulkOrder.orders,
       feasible: bulkOrder.feasible,
       uploadedAt: bulkOrder.uploadedAt
     };
@@ -66,7 +63,6 @@ class ServerlessStorage {
 
 const storage = new ServerlessStorage();
 
-// Helper function to fetch current inventory from Quickbase
 async function fetchCurrentInventory(): Promise<Map<string, number>> {
   const inventoryMap = new Map<string, number>();
   
@@ -81,7 +77,7 @@ async function fetchCurrentInventory(): Promise<Map<string, number>> {
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // Shorter timeout for serverless
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     const response = await fetch(`https://api.quickbase.com/v1/records/query`, {
       method: 'POST',
@@ -92,7 +88,7 @@ async function fetchCurrentInventory(): Promise<Map<string, number>> {
       },
       body: JSON.stringify({
         from: QB_TABLE_ID,
-        select: [6, 13], // SAP Code field (6) and Stock field (13)
+        select: [6, 13],
         options: {
           compareWithAppLocalTime: false
         }
@@ -109,7 +105,6 @@ async function fetchCurrentInventory(): Promise<Map<string, number>> {
 
     const data = await response.json();
     
-    // Build inventory map from Quickbase data
     for (const record of data.data) {
       const sapCode = record['6']?.value;
       const stock = record['13']?.value || 0;
@@ -129,37 +124,17 @@ async function fetchCurrentInventory(): Promise<Map<string, number>> {
 }
 
 async function generateHTMLReport(bulkOrder: any): Promise<string> {
-  let orders: any[] = [];
-  
-  // Safely parse orders data
-  try {
-    if (typeof bulkOrder.orders === 'string') {
-      orders = JSON.parse(bulkOrder.orders);
-    } else if (Array.isArray(bulkOrder.orders)) {
-      orders = bulkOrder.orders;
-    } else {
-      console.error('Orders data is not in expected format:', typeof bulkOrder.orders);
-      orders = [];
-    }
-  } catch (error) {
-    console.error('Failed to parse orders data:', error);
-    orders = [];
-  }
+  const orders = Array.isArray(bulkOrder.orders) 
+    ? bulkOrder.orders 
+    : typeof bulkOrder.orders === 'string' 
+      ? JSON.parse(bulkOrder.orders) 
+      : [];
 
-  // Fetch current inventory data for accurate shortage calculation
   const currentInventory = await fetchCurrentInventory();
-
-  // Ensure data consistency - convert string values to numbers if needed
-  const processedBulkOrder = {
-    ...bulkOrder,
-    totalOrders: typeof bulkOrder.totalOrders === 'string' ? parseInt(bulkOrder.totalOrders) : bulkOrder.totalOrders,
-    feasible: typeof bulkOrder.feasible === 'string' ? parseInt(bulkOrder.feasible) : bulkOrder.feasible,
-    totalCost: typeof bulkOrder.totalCost === 'string' ? parseFloat(bulkOrder.totalCost) : bulkOrder.totalCost
-  };
-
-  // Calculate success rate
-  const successRate = processedBulkOrder.totalOrders > 0 ? 
-    ((processedBulkOrder.feasible / processedBulkOrder.totalOrders) * 100).toFixed(1) : '0.0';
+  const totalOrders = parseInt(bulkOrder.totalOrders) || 0;
+  const feasible = parseInt(bulkOrder.feasible) || 0;
+  const totalCost = parseFloat(bulkOrder.totalCost) || 0;
+  const successRate = totalOrders > 0 ? ((feasible / totalOrders) * 100).toFixed(1) : '0.0';
   
   return `
     <!DOCTYPE html>
@@ -420,7 +395,7 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
             <div class="header">
                 <div class="header-content">
                     <h1>📦 Bulk Order Analysis Report</h1>
-                    <p class="header-info"><strong>File:</strong> ${processedBulkOrder.fileName}</p>
+                    <p class="header-info"><strong>File:</strong> ${bulkOrder.fileName}</p>
                     <p class="header-info"><strong>Generated:</strong> ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</p>
                 </div>
             </div>
@@ -430,11 +405,11 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
                     <h2 style="margin-top: 0; border: none; padding: 0;">📊 Executive Summary</h2>
                     <div class="summary-grid">
                         <div class="summary-item">
-                            <div class="summary-number total-orders">${processedBulkOrder.totalOrders}</div>
+                            <div class="summary-number total-orders">${totalOrders}</div>
                             <div class="summary-label">Total Orders</div>
                         </div>
                         <div class="summary-item">
-                            <div class="summary-number feasible-orders">${processedBulkOrder.feasible}</div>
+                            <div class="summary-number feasible-orders">${feasible}</div>
                             <div class="summary-label">Feasible Orders</div>
                         </div>
                         <div class="summary-item">
@@ -442,7 +417,7 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
                             <div class="summary-label">Success Rate</div>
                         </div>
                         <div class="summary-item">
-                            <div class="summary-number total-cost">€${processedBulkOrder.totalCost?.toFixed(2) || '0.00'}</div>
+                            <div class="summary-number total-cost">€${totalCost.toFixed(2)}</div>
                             <div class="summary-label">Total Cost</div>
                         </div>
                     </div>
@@ -469,8 +444,14 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
                         </td>
                         <td><strong>${order.bagName || 'Custom Bag'}</strong></td>
                         <td>${order.specs ? `${order.specs.width}×${order.specs.gusset}×${order.specs.height}` : 'N/A'}</td>
-                        <td>${order.actualBags?.toLocaleString() || (order.orderUnit === 'cartons' ? (order.orderQty * 250).toLocaleString() : order.orderQty)} bags</td>
-                        <td>€${((order.totalCost || 0) / (order.actualBags || (order.orderUnit === 'cartons' ? order.orderQty * 250 : order.orderQty) || 1)).toFixed(4)}</td>
+                        <td>${(() => {
+                            const bags = order.actualBags || (order.orderUnit === 'cartons' ? order.orderQty * 250 : order.orderQty);
+                            return bags?.toLocaleString() || 0;
+                        })()} bags</td>
+                        <td>€${(() => {
+                            const bags = order.actualBags || (order.orderUnit === 'cartons' ? order.orderQty * 250 : order.orderQty) || 1;
+                            return ((order.totalCost || 0) / bags).toFixed(4);
+                        })()}</td>
                         <td class="cost">€${(order.totalCost || 0).toFixed(2)}</td>
                         <td class="${order.feasible ? 'status-feasible' : 'status-not-feasible'}">
                             ${order.feasible ? 'Feasible' : 'Not Feasible'}
@@ -481,62 +462,51 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
             </tbody>
         </table>
         
-        <!-- Combined Materials Requirements Table -->
         <h2>🔧 Combined Materials Requirements</h2>
         ${(() => {
-            try {
-                // Calculate total requirements across all orders
-                const materialRequirements = new Map();
-                let totalOrdersProcessed = 0;
-                let totalOrdersWithBOM = 0;
-                
-                orders.forEach((order: any, index: number) => {
-                    if (order.bom && Array.isArray(order.bom)) {
-                        totalOrdersWithBOM++;
-                        order.bom.forEach((item: any) => {
-                            if (!item.sapCode) return;
-                            
-                            const existing = materialRequirements.get(item.sapCode) || {
-                                sapCode: item.sapCode,
-                                description: item.description || 'N/A',
-                                type: item.type || 'N/A',
-                                unit: item.unit || 'N/A',
-                                totalRequired: 0,
-                                availableStock: currentInventory.get(item.sapCode) || 0,
-                                ordersUsingThis: []
-                            };
-                            
-                            existing.totalRequired += (item.totalQuantity || 0);
-                            existing.ordersUsingThis.push(`#${order.processingOrder || index + 1}`);
-                            materialRequirements.set(item.sapCode, existing);
-                        });
-                    }
-                    totalOrdersProcessed++;
-                });
-                
-                if (materialRequirements.size === 0) {
-                    return '<p>No material requirements found in orders.</p>';
+            const materialRequirements = new Map();
+            let totalOrdersWithBOM = 0;
+            
+            orders.forEach((order, index) => {
+                if (order.bom?.length) {
+                    totalOrdersWithBOM++;
+                    order.bom.forEach(item => {
+                        if (!item.sapCode) return;
+                        
+                        const existing = materialRequirements.get(item.sapCode) || {
+                            sapCode: item.sapCode,
+                            description: item.description || 'N/A',
+                            type: item.type || 'N/A',
+                            unit: item.unit || 'N/A',
+                            totalRequired: 0,
+                            availableStock: currentInventory.get(item.sapCode) || 0,
+                            ordersUsingThis: []
+                        };
+                        
+                        existing.totalRequired += (item.totalQuantity || 0);
+                        existing.ordersUsingThis.push(`#${order.processingOrder || index + 1}`);
+                        materialRequirements.set(item.sapCode, existing);
+                    });
                 }
+            });
+            
+            if (materialRequirements.size === 0) {
+                return '<p>No material requirements found in orders.</p>';
+            }
+            
+            const materials = Array.from(materialRequirements.values()).sort((a, b) => {
+                const aShortage = Math.max(0, a.totalRequired - a.availableStock);
+                const bShortage = Math.max(0, b.totalRequired - b.availableStock);
+                const aPercent = a.totalRequired ? aShortage / a.totalRequired : 0;
+                const bPercent = b.totalRequired ? bShortage / b.totalRequired : 0;
                 
-                const materials = Array.from(materialRequirements.values()).sort((a, b) => {
-                    // Sort by shortage severity first, then by type and description
-                    const aShortage = Math.max(0, a.totalRequired - a.availableStock);
-                    const bShortage = Math.max(0, b.totalRequired - b.availableStock);
-                    const aShortagePercentage = a.totalRequired > 0 ? (aShortage / a.totalRequired) : 0;
-                    const bShortagePercentage = b.totalRequired > 0 ? (bShortage / b.totalRequired) : 0;
-                    
-                    // First sort by shortage percentage (highest first)
-                    if (aShortagePercentage !== bShortagePercentage) {
-                        return bShortagePercentage - aShortagePercentage;
-                    }
-                    
-                    // Then sort by material type and description
-                    return a.type.localeCompare(b.type) || a.description.localeCompare(b.description);
-                });
+                return bPercent !== aPercent ? bPercent - aPercent : 
+                       a.type.localeCompare(b.type) || a.description.localeCompare(b.description);
+            });
                 
                 return `
                     <div class="summary" style="margin-bottom: 24px;">
-                        <p><strong>Analysis:</strong> ${totalOrdersWithBOM} of ${totalOrdersProcessed} orders have detailed material requirements.</p>
+                        <p><strong>Analysis:</strong> ${totalOrdersWithBOM} of ${orders.length} orders have detailed material requirements.</p>
                         <p><strong>Note:</strong> This table shows total material requirements across all orders vs current inventory levels. Red rows indicate materials with shortages.</p>
                         ${(() => {
                             const shortages = materials.filter(m => m.totalRequired > m.availableStock);
@@ -594,10 +564,6 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
                         </tbody>
                     </table>
                 `;
-            } catch (error) {
-                console.error('Error generating materials summary:', error);
-                return '<p>Error generating materials summary table.</p>';
-            }
         })()}
 
         ${orders.map((order: any, index: number) => `
@@ -629,7 +595,11 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
                             </div>
                             <div class="spec-row">
                                 <span class="spec-label">Quantity:</span> 
-                                <span class="spec-value">${(order.actualBags || (order.orderUnit === 'cartons' ? order.orderQty * 250 : order.orderQty) || 0).toLocaleString()} bags ${order.orderUnit === 'cartons' ? `(${order.orderQty} cartons)` : ''}</span>
+                                <span class="spec-value">${(() => {
+                                    const bags = order.actualBags || (order.orderUnit === 'cartons' ? order.orderQty * 250 : order.orderQty) || 0;
+                                    const cartonsText = order.orderUnit === 'cartons' ? ` (${order.orderQty} cartons)` : '';
+                                    return `${bags.toLocaleString()} bags${cartonsText}`;
+                                })()}</span>
                             </div>
                             <div class="spec-row">
                                 <span class="spec-label">Total Cost:</span> 
@@ -711,7 +681,6 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Handle CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -752,7 +721,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('HTML export error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Failed to generate HTML report';
     
-    // Return HTML error page instead of JSON for better user experience
     const errorHtml = `
       <!DOCTYPE html>
       <html>

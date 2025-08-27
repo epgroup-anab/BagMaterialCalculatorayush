@@ -4,10 +4,8 @@ import { parse } from 'csv-parse';
 import * as XLSX from 'xlsx';
 import { z } from 'zod';
 
-// Import storage and models - define inline for serverless
 import mongoose, { Document, Schema } from 'mongoose';
 
-// Define models inline for serverless compatibility
 interface IBulkOrder extends Document {
   _id: string;
   fileName: string;
@@ -22,15 +20,13 @@ const BulkOrderSchema = new Schema<IBulkOrder>({
   fileName: { type: String, required: true },
   totalOrders: { type: Number, required: true },
   totalCost: { type: Number, required: true },
-  orders: { type: [Schema.Types.Mixed], required: true },
+  orders: [{ type: Schema.Types.Mixed, required: true }],
   feasible: { type: Number, required: true },
   uploadedAt: { type: Date, default: Date.now }
 });
 
-// Use a different model name to avoid conflicts
 const ServerlessBulkOrder = mongoose.models.ServerlessBulkOrder || mongoose.model<IBulkOrder>('ServerlessBulkOrder', BulkOrderSchema);
 
-// MongoDB connection for serverless
 let isConnected = false;
 
 const connectToDatabase = async () => {
@@ -51,7 +47,6 @@ const connectToDatabase = async () => {
   }
 };
 
-// Storage interface for serverless
 interface ServerlessStorage {
   insertBulkOrder(bulkOrder: {
     fileName: string;
@@ -127,16 +122,14 @@ class ServerlessMemStorage implements ServerlessStorage {
   }
 }
 
-// Initialize storage
 const storage: ServerlessStorage = process.env.MONGODB_URI || process.env.DATABASE_URL 
   ? new ServerlessMongoStorage() 
   : new ServerlessMemStorage();
 
-// Configure multer for Vercel (in-memory storage)
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: 10 * 1024 * 1024,
   },
   fileFilter: (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
     if (file.mimetype === 'text/csv' || 
@@ -149,7 +142,6 @@ const upload = multer({
   }
 });
 
-// Middleware wrapper for Vercel
 function runMiddleware(req: any, res: any, fn: any) {
   return new Promise((resolve, reject) => {
     fn(req, res, (result: any) => {
@@ -162,7 +154,6 @@ function runMiddleware(req: any, res: any, fn: any) {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Handle CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -178,7 +169,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Run multer middleware
     await runMiddleware(req, res, upload.single('file'));
     
     const file = (req as any).file;
@@ -188,38 +178,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    console.log(`Processing file: ${file.originalname}, size: ${file.size} bytes`);
 
     let parsedData: any[] = [];
     const fileExtension = file.originalname.split('.').pop()?.toLowerCase();
 
-    // Parse file based on type
     if (fileExtension === 'csv') {
-      console.log('Parsing CSV file...');
       parsedData = await parseCSV(file.buffer);
     } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
-      console.log('Parsing Excel file...');
       parsedData = await parseExcel(file.buffer);
     } else {
       console.error(`Unsupported file format: ${fileExtension}`);
       return res.status(400).json({ error: 'Unsupported file format' });
     }
 
-    console.log(`Parsed ${parsedData.length} rows from file`);
 
-    // Validate and process data
-    console.log('Validating order data...');
     const validatedOrders = validateOrderData(parsedData);
-    console.log(`Validated ${validatedOrders.length} orders`);
     
-    // Calculate all orders using sequential processing logic
-    console.log('🚀 Starting sequential inventory and machine planning...');
     const { results: calculatedOrders, summary } = await processOrdersWithSequentialInventory(validatedOrders);
-    console.log(`✅ Processing complete: ${summary.feasibleOrders}/${summary.totalOrders} orders feasible`);
     
     try {
-      // Save to database with enhanced data
-      console.log('Saving to database...');
       const bulkOrder = await storage.insertBulkOrder({
         fileName: file.originalname,
         totalOrders: summary.totalOrders,
@@ -227,9 +204,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         orders: JSON.stringify(calculatedOrders),
         feasible: summary.feasibleOrders,
       });
-      console.log(`Database save successful with ID: ${bulkOrder.id}`);
 
-      // Ensure we return a proper JSON response
       const response = {
         id: bulkOrder.id,
         message: 'Bulk upload processed successfully with sequential inventory and machine planning',
@@ -241,13 +216,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           machineUtilization: summary.machineUtilization || [],
           productionSchedule: summary.productionSchedule || []
         },
-        orders: calculatedOrders.slice(0, 10) // Limit response size for serverless
+        orders: calculatedOrders.slice(0, 10)
       };
 
       res.status(200).json(response);
     } catch (dbError) {
       console.error('Database save error:', dbError);
-      // Return success even if DB save fails, with in-memory results
       const response = {
         id: Date.now().toString(),
         message: 'Bulk upload processed successfully (database save failed, using temporary storage)',
@@ -272,7 +246,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-// Helper functions
 async function parseCSV(buffer: Buffer): Promise<any[]> {
   return new Promise((resolve, reject) => {
     const records: any[] = [];
@@ -560,7 +533,7 @@ async function processOrdersWithSequentialInventory(orders: any[]): Promise<{res
   const runningInventory = await fetchAllInventory();
   const machineFleet = initializeMachineFleet();
   const productionSchedule: MachineSchedule[] = [];
-  const results = [];
+  const results: any[] = [];
   
   let totalProcessedCost = 0;
   let feasibleOrdersCount = 0;

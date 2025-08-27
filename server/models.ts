@@ -50,7 +50,7 @@ const BulkOrderSchema = new Schema<IBulkOrder>({
     required: true
   },
   orders: {
-    type: [Schema.Types.Mixed], // Store as array of objects
+    type: Schema.Types.Mixed, // Store as array of objects
     required: true
   },
   feasible: {

@@ -9,209 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Calculator, Package, TrendingUp, AlertTriangle, CheckCircle, Clock, RefreshCw, Factory, Weight, Settings, Cpu, Trash2 } from "lucide-react";
 import { SKU_DATA, type SKUData } from "@/data/skuData";
+import { MACHINES_DATA } from "@/data/machinesData";
+import { MATERIAL_DATABASE } from "@/data/materialDatabase";
 
-// Import data from other pages
-const INVENTORY_DATA = {
-  // Paper materials
-  "1003696": { name: "Virgin Kraft 80-90 GSM", currentStock: 2500, unit: "KG", minStock: 500, price: 1.2, leadTime: 7 },
-  "1003697": { name: "Virgin Kraft 90 GSM", currentStock: 1800, unit: "KG", minStock: 400, price: 1.25, leadTime: 7 },
-  "1003771": { name: "Virgin Kraft 85 GSM", currentStock: 800, unit: "KG", minStock: 300, price: 1.15, leadTime: 7 },
-  "1003988": { name: "Virgin Kraft 75 GSM", currentStock: 600, unit: "KG", minStock: 200, price: 1.1, leadTime: 7 },
-  "1004016": { name: "Virgin/Recycled Kraft 50 GSM", currentStock: 1200, unit: "KG", minStock: 300, price: 1.0, leadTime: 7 },
-  "1004017": { name: "Recycled Kraft 100 GSM", currentStock: 900, unit: "KG", minStock: 250, price: 1.3, leadTime: 7 },
-  "1004061": { name: "Paper Special Grade", currentStock: 400, unit: "KG", minStock: 150, price: 1.35, leadTime: 10 },
-  
-  // Adhesives
-  "1004557": { name: "Cold Melt Adhesive", currentStock: 150, unit: "KG", minStock: 30, price: 8.5, leadTime: 5 },
-  "1004555": { name: "Hot Melt Adhesive", currentStock: 120, unit: "KG", minStock: 25, price: 9.2, leadTime: 5 },
-  
-  // Handles
-  "1003688": { name: "Flat Paper Handle", currentStock: 80, unit: "KG", minStock: 20, price: 3.5, leadTime: 10 },
-  "1003930": { name: "Flat Paper Handle (Alternative)", currentStock: 65, unit: "KG", minStock: 15, price: 3.2, leadTime: 10 },
-  "1003967": { name: "Twisted Paper Handle", currentStock: 25, unit: "KG", minStock: 10, price: 12.5, leadTime: 14 },
-  
-  // Patches
-  "1003695": { name: "Handle Patch for Flat Handles", currentStock: 30, unit: "KG", minStock: 8, price: 4.8, leadTime: 12 },
-  "1003823": { name: "Handle Patch (Alternative)", currentStock: 22, unit: "KG", minStock: 6, price: 4.5, leadTime: 12 },
-  "1003948": { name: "Handle Patch for Twisted Handles", currentStock: 15, unit: "KG", minStock: 5, price: 5.2, leadTime: 12 },
-  
-  // Cartons
-  "1003530": { name: "Standard Carton Box", currentStock: 2000, unit: "PC", minStock: 500, price: 0.15, leadTime: 3 },
-  "1004232": { name: "Small Carton Box", currentStock: 1500, unit: "PC", minStock: 300, price: 0.12, leadTime: 3 },
-  "1004289": { name: "Medium Carton Box", currentStock: 1000, unit: "PC", minStock: 200, price: 0.18, leadTime: 3 },
-  "1004308": { name: "Large Carton Box", currentStock: 800, unit: "PC", minStock: 150, price: 0.22, leadTime: 3 }
-};
 
-const MACHINES_DATA = {
-  'M1': {
-    name: 'M1',
-    category: 'GM 5QT FH',
-    description: 'Garant Triumph 5QT',
-    handleType: 'FLAT HANDLE',
-    maxColors: 1,
-    dailyCapacity: 82000,
-    speed: 100,
-    minWidth: 800,
-    maxWidth: 1100,
-    minGSM: 70,
-    maxGSM: 100,
-    status: 'available',
-    currentUtilization: 65
-  },
-  'M2': {
-    name: 'M2',
-    category: 'GM 5QT FH',
-    description: 'Garant Triumph 5QT',
-    handleType: 'FLAT HANDLE',
-    maxColors: 3,
-    dailyCapacity: 82000,
-    speed: 100,
-    minWidth: 800,
-    maxWidth: 1100,
-    minGSM: 70,
-    maxGSM: 100,
-    status: 'busy',
-    currentUtilization: 85
-  },
-  'M3': {
-    name: 'M3',
-    category: 'GM 5QT FH',
-    description: 'Garant Triumph 5QT',
-    handleType: 'FLAT HANDLE',
-    maxColors: 3,
-    dailyCapacity: 82000,
-    speed: 100,
-    minWidth: 800,
-    maxWidth: 1100,
-    minGSM: 70,
-    maxGSM: 100,
-    status: 'available',
-    currentUtilization: 45
-  },
-  'M4': {
-    name: 'M4',
-    category: 'GM 5QT FH',
-    description: 'Garant Triumph 5QT',
-    handleType: 'FLAT HANDLE',
-    maxColors: 1,
-    dailyCapacity: 82000,
-    speed: 100,
-    minWidth: 800,
-    maxWidth: 1100,
-    minGSM: 70,
-    maxGSM: 100,
-    status: 'available',
-    currentUtilization: 30
-  },
-  'M5': {
-    name: 'M5',
-    category: 'GM 5F6 FH',
-    description: 'Garant 5F6',
-    handleType: 'FLAT HANDLE',
-    maxColors: 4,
-    dailyCapacity: 82000,
-    speed: 100,
-    minWidth: 700,
-    maxWidth: 1200,
-    minGSM: 70,
-    maxGSM: 110,
-    supportsPatch: true,
-    status: 'available',
-    currentUtilization: 55
-  },
-  'M6': {
-    name: 'M6',
-    category: 'GM 5F6 TH',
-    description: 'Garant 5F6',
-    handleType: 'TWISTED HANDLE',
-    maxColors: 2,
-    dailyCapacity: 82000,
-    speed: 100,
-    minWidth: 700,
-    maxWidth: 1200,
-    minGSM: 70,
-    maxGSM: 110,
-    status: 'maintenance',
-    currentUtilization: 0
-  },
-  'NL1': {
-    name: 'NL1',
-    category: 'NL FH',
-    description: 'Newlong',
-    handleType: 'FLAT HANDLE',
-    maxColors: 2,
-    dailyCapacity: 65600,
-    speed: 80,
-    minWidth: 750,
-    maxWidth: 1000,
-    minGSM: 75,
-    maxGSM: 95,
-    status: 'available',
-    currentUtilization: 70
-  },
-  'NL2': {
-    name: 'NL2',
-    category: 'NL FH',
-    description: 'Newlong',
-    handleType: 'FLAT HANDLE',
-    maxColors: 2,
-    dailyCapacity: 65600,
-    speed: 80,
-    minWidth: 750,
-    maxWidth: 1000,
-    minGSM: 75,
-    maxGSM: 95,
-    status: 'available',
-    currentUtilization: 40
-  }
-};
-
-const MATERIAL_DATABASE = {
-  PAPER: {
-    VIRGIN: {
-      "50": { sapCode: "1004016", description: "Virgin Kraft 50 GSM" },
-      "70": { sapCode: "1004359", description: "Virgin Kraft 70 GSM" },
-      "75": { sapCode: "1003988", description: "Virgin Kraft 75 GSM" },
-      "80": { sapCode: "1003696", description: "Virgin Kraft 80 GSM" },
-      "85": { sapCode: "1003771", description: "Virgin Kraft 85 GSM" },
-      "90": { sapCode: "1003696", description: "Virgin Kraft 90 GSM" },
-      "100": { sapCode: "1004286", description: "Virgin Kraft 100 GSM" },
-      "120": { sapCode: "1004369", description: "Virgin Kraft 120 GSM" },
-      "150": { sapCode: "1003833", description: "Virgin Kraft 150 GSM" }
-    },
-    RECYCLED: {
-      "50": { sapCode: "1004016", description: "Recycled Kraft 50 GSM" },
-      "70": { sapCode: "1004359", description: "Recycled Kraft 70 GSM" },
-      "80": { sapCode: "1003696", description: "Recycled Kraft 80 GSM" },
-      "85": { sapCode: "1003696", description: "Recycled Kraft 85 GSM" },
-      "90": { sapCode: "1003696", description: "Recycled Kraft 90 GSM" },
-      "100": { sapCode: "1004017", description: "Recycled Kraft 100 GSM" }
-    },
-    FIBREFORM: {
-      "150": { sapCode: "1003998", description: "Fibreform 150 GSM" }
-    }
-  },
-  GLUE: {
-    COLD: { sapCode: "1004557", description: "Cold Melt Adhesive" },
-    HOT: { sapCode: "1004555", description: "Hot Melt Adhesive" }
-  },
-  HANDLE: {
-    FLAT: { sapCode: "1003688", description: "Flat Paper Handle" },
-    FLAT_ALT: { sapCode: "1003930", description: "Flat Paper Handle (Alternative)" },
-    TWISTED: { sapCode: "1003967", description: "Twisted Paper Handle" }
-  },
-  PATCH: {
-    FLAT: { sapCode: "1003695", description: "Handle Patch for Flat Handles" },
-    FLAT_ALT: { sapCode: "1003823", description: "Handle Patch (Alternative)" },
-    TWISTED: { sapCode: "1003948", description: "Handle Patch for Twisted Handles" }
-  },
-  CARTON: {
-    STANDARD: { sapCode: "1003530", description: "Standard Carton Box" },
-    SMALL: { sapCode: "1004232", description: "Small Carton Box" },
-    MEDIUM: { sapCode: "1004289", description: "Medium Carton Box" },
-    LARGE: { sapCode: "1004308", description: "Large Carton Box" }
-  }
-} as const;
 
 type BOMItem = {
   type: string;
@@ -283,21 +84,18 @@ export default function CombinedCalculator() {
   const [stockData, setStockData] = useState<Record<string, number>>({});
   const [stockDataLoading, setStockDataLoading] = useState(true);
 
-  // Fetch stock data from QuickBase API with fallback to hardcoded data
   const fetchStockData = async (sapCode: string): Promise<number> => {
     try {
       const response = await fetch(`/api/inventory?sapCode=${sapCode}`);
       if (!response.ok) {
-        console.warn(`Failed to fetch stock for ${sapCode}:`, response.status, '- Using fallback data');
-        // Return fallback data from INVENTORY_DATA
-        return INVENTORY_DATA[sapCode as keyof typeof INVENTORY_DATA]?.currentStock || 0;
+        console.warn(`Failed to fetch stock for ${sapCode}:`, response.status);
+        return 0;
       }
       const data = await response.json();
       return data.stock || 0;
     } catch (error) {
-      console.error(`Error fetching stock for ${sapCode}:`, error, '- Using fallback data');
-      // Return fallback data from INVENTORY_DATA
-      return INVENTORY_DATA[sapCode as keyof typeof INVENTORY_DATA]?.currentStock || 0;
+      console.error(`Error fetching stock for ${sapCode}:`, error);
+      return 0;
     }
   };
 
@@ -306,7 +104,22 @@ export default function CombinedCalculator() {
     const loadAllStockData = async () => {
       setStockDataLoading(true);
       try {
-        const stockPromises = Object.keys(INVENTORY_DATA).map(async (sapCode) => {
+        // Get all SAP codes from material database
+        const allSapCodes = new Set<string>();
+        
+        // Collect SAP codes from material database
+        Object.values(MATERIAL_DATABASE.PAPER.VIRGIN).forEach(item => allSapCodes.add(item.sapCode));
+        Object.values(MATERIAL_DATABASE.PAPER.RECYCLED).forEach(item => allSapCodes.add(item.sapCode));
+        Object.values(MATERIAL_DATABASE.PAPER.FIBREFORM).forEach(item => allSapCodes.add(item.sapCode));
+        allSapCodes.add(MATERIAL_DATABASE.GLUE.COLD.sapCode);
+        allSapCodes.add(MATERIAL_DATABASE.GLUE.HOT.sapCode);
+        allSapCodes.add(MATERIAL_DATABASE.HANDLE.FLAT.sapCode);
+        allSapCodes.add(MATERIAL_DATABASE.HANDLE.TWISTED.sapCode);
+        allSapCodes.add(MATERIAL_DATABASE.PATCH.FLAT.sapCode);
+        allSapCodes.add(MATERIAL_DATABASE.PATCH.TWISTED.sapCode);
+        Object.values(MATERIAL_DATABASE.CARTON).forEach(item => allSapCodes.add(item.sapCode));
+        
+        const stockPromises = Array.from(allSapCodes).map(async (sapCode) => {
           const stock = await fetchStockData(sapCode);
           return { sapCode, stock };
         });
@@ -319,12 +132,8 @@ export default function CombinedCalculator() {
         setStockData(newStockData);
       } catch (error) {
         console.error('Error loading stock data:', error);
-        // Use fallback data in case of complete failure
-        const fallbackStockData: Record<string, number> = {};
-        Object.keys(INVENTORY_DATA).forEach(sapCode => {
-          fallbackStockData[sapCode] = INVENTORY_DATA[sapCode as keyof typeof INVENTORY_DATA]?.currentStock || 0;
-        });
-        setStockData(fallbackStockData);
+        // In case of complete failure, set empty stock data
+        setStockData({});
       } finally {
         setStockDataLoading(false);
       }
@@ -485,29 +294,28 @@ export default function CombinedCalculator() {
     const recommendations: string[] = [];
 
     bomItems.forEach(item => {
-      const inventoryItem = INVENTORY_DATA[item.sapCode as keyof typeof INVENTORY_DATA];
-      if (!inventoryItem) return;
-
+      const currentStock = stockData[item.sapCode] || 0;
       const required = item.quantity * actualBags;
-      const available = stockData[item.sapCode] ?? 0;
+      const available = currentStock;
       const shortage = Math.max(0, required - available);
-      const cost = required * inventoryItem.price;
+      const estimatedPrice = 10; // Default price since we don't have inventory data
+      const cost = required * estimatedPrice;
       
       let status: 'sufficient' | 'low' | 'critical' = 'sufficient';
       if (shortage > 0) {
         status = 'critical';
         feasible = false;
-        warnings.push(`Insufficient ${inventoryItem.name}: need ${required.toFixed(3)}${item.unit}, have ${available.toFixed(3)}${item.unit}`);
-        recommendations.push(`Order ${shortage.toFixed(3)}${item.unit} of ${inventoryItem.name} (lead time: ${inventoryItem.leadTime} days)`);
-      } else if (available - required < inventoryItem.minStock) {
+        warnings.push(`Insufficient ${item.description}: need ${required.toFixed(3)}${item.unit}, have ${available.toFixed(3)}${item.unit}`);
+        recommendations.push(`Order ${shortage.toFixed(3)}${item.unit} of ${item.description}`);
+      } else if (available > 0 && available - required < 100) { // Generic minimum threshold
         status = 'low';
-        warnings.push(`${inventoryItem.name} will fall below minimum stock after order`);
-        recommendations.push(`Consider reordering ${inventoryItem.name} to maintain safety stock`);
+        warnings.push(`${item.description} will fall below minimum stock after order`);
+        recommendations.push(`Consider reordering ${item.description} to maintain safety stock`);
       }
 
       materialRequirements.push({
         sapCode: item.sapCode,
-        name: inventoryItem.name,
+        name: item.description,
         required,
         available,
         shortage,
