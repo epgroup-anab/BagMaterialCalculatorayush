@@ -361,7 +361,7 @@ export default function CombinedCalculator() {
         compatibility,
         production,
         score: compatibility.compatible ? 
-          (production.canMeetDeadline ? 100 - machine.currentUtilization : 50) : 0
+          (production.canMeetDeadline ? 100 - (machine.currentUtilization || 0) : 50) : 0
       };
     });
 

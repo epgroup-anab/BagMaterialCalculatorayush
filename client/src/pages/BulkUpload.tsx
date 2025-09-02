@@ -278,7 +278,6 @@ export default function BulkUpload() {
                         <th className="text-left px-4 py-3 font-semibold">SKU</th>
                         <th className="text-right px-4 py-3 font-semibold">Quantity</th>
                         <th className="text-right px-4 py-3 font-semibold">Bags</th>
-                        <th className="text-right px-4 py-3 font-semibold">Cost</th>
                         <th className="text-center px-4 py-3 font-semibold">Status</th>
                       </tr>
                     </thead>
@@ -294,9 +293,6 @@ export default function BulkUpload() {
                           </td>
                           <td className="px-4 py-3 text-right font-mono font-bold">
                             {order.actualBags?.toLocaleString() || order.orderQty.toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3 text-right font-mono font-bold">
-                            €{(order.totalCost || 0).toFixed(2)}
                           </td>
                           <td className="px-4 py-3 text-center">
                             <Badge 

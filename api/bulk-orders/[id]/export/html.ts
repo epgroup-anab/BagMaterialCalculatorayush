@@ -134,7 +134,7 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
   const totalOrders = parseInt(bulkOrder.totalOrders) || 0;
   const feasible = parseInt(bulkOrder.feasible) || 0;
   const totalCost = parseFloat(bulkOrder.totalCost) || 0;
-  const successRate = totalOrders > 0 ? ((feasible / totalOrders) * 100).toFixed(1) : '0.0';
+  const successRate = totalOrders > 0 ? ((feasible / totalOrders) * 100).toFixed(3) : '0.000';
   
   return `
     <!DOCTYPE html>
@@ -417,7 +417,7 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
                             <div class="summary-label">Success Rate</div>
                         </div>
                         <div class="summary-item">
-                            <div class="summary-number total-cost">€${totalCost.toFixed(2)}</div>
+                            <div class="summary-number total-cost">€${totalCost.toFixed(3)}</div>
                             <div class="summary-label">Total Cost</div>
                         </div>
                     </div>
@@ -450,9 +450,9 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
                         })()} bags</td>
                         <td>€${(() => {
                             const bags = order.actualBags || (order.orderUnit === 'cartons' ? order.orderQty * 250 : order.orderQty) || 1;
-                            return ((order.totalCost || 0) / bags).toFixed(4);
+                            return ((order.totalCost || 0) / bags).toFixed(3);
                         })()}</td>
-                        <td class="cost">€${(order.totalCost || 0).toFixed(2)}</td>
+                        <td class="cost">€${(order.totalCost || 0).toFixed(3)}</td>
                         <td class="${order.feasible ? 'status-feasible' : 'status-not-feasible'}">
                             ${order.feasible ? 'Feasible' : 'Not Feasible'}
                             ${order.assignedMachine ? `<div class="machine-assignment">Machine: ${order.assignedMachine}</div>` : ''}
@@ -552,7 +552,7 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
                                         <td>${material.unit}</td>
                                         <td class="cost">${material.availableStock.toFixed(3)}</td>
                                         <td class="${hasShortage ? 'status-not-feasible' : 'status-feasible'}">
-                                            ${hasShortage ? `${shortage.toFixed(3)} (${shortagePercentage.toFixed(1)}%)` : '0.000 (0%)'}
+                                            ${hasShortage ? `${shortage.toFixed(3)} (${shortagePercentage.toFixed(3)}%)` : '0.000 (0.000%)'}
                                         </td>
                                         <td style="font-size: 12px;">${material.ordersUsingThis.join(', ')}</td>
                                         <td class="${hasShortage ? 'status-not-feasible' : 'status-feasible'}">
@@ -603,7 +603,7 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
                             </div>
                             <div class="spec-row">
                                 <span class="spec-label">Total Cost:</span> 
-                                <span class="cost">€${(order.totalCost || 0).toFixed(2)}</span>
+                                <span class="cost">€${(order.totalCost || 0).toFixed(3)}</span>
                             </div>
                         </div>
                     ` : ''}
@@ -629,7 +629,7 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
                                         <td>${item.description}</td>
                                         <td>${item.totalQuantity?.toFixed(3) || 'N/A'}</td>
                                         <td>${item.unit}</td>
-                                        <td class="cost">€${item.totalCost?.toFixed(2) || '0.00'}</td>
+                                        <td class="cost">€${item.totalCost?.toFixed(3) || '0.000'}</td>
                                     </tr>
                                 `).join('')}
                             </tbody>
