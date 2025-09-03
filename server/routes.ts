@@ -476,8 +476,50 @@ function checkInventoryWithRunningTotal(bom: any[], runningInventory: Map<string
   };
 }
 
-// Helper function to find available machine for order specs
-function findAvailableMachine(specs: any, machines: MachineSpec[], deliveryDays: number = 14): {machine: MachineSpec | null, scheduledEndTime: Date | null} {
+function calculateMachineScore(machine: MachineSpec, specs: any, bagQuantity: number, deliveryDays: number, allMachines: MachineSpec[]): number {
+  let score = 0;
+  
+  const productionHours = bagQuantity / machine.capacity;
+  const optimalProductionHours = 8;
+  
+  if (productionHours <= optimalProductionHours) {
+    score += 40 * (productionHours / optimalProductionHours);
+  } else {
+    score += 40 * (optimalProductionHours / productionHours);
+  }
+  
+  const currentTime = new Date();
+  const hoursUntilAvailable = Math.max(0, (machine.nextAvailableTime.getTime() - currentTime.getTime()) / (1000 * 60 * 60));
+  const avgBusyTime = allMachines.reduce((sum, m) => sum + Math.max(0, (m.nextAvailableTime.getTime() - currentTime.getTime()) / (1000 * 60 * 60)), 0) / allMachines.length;
+  
+  const utilizationScore = avgBusyTime > 0 ? Math.max(0, 25 * (1 - (hoursUntilAvailable / avgBusyTime))) : 25;
+  score += utilizationScore;
+  
+  const deliveryDeadline = new Date();
+  deliveryDeadline.setDate(deliveryDeadline.getDate() + deliveryDays);
+  const completionTime = new Date(machine.nextAvailableTime.getTime() + productionHours * 60 * 60 * 1000);
+  
+  if (completionTime <= deliveryDeadline) {
+    const timeBuffer = (deliveryDeadline.getTime() - completionTime.getTime()) / (1000 * 60 * 60 * 24);
+    score += 20 * Math.min(1, timeBuffer / 2);
+  } else {
+    score = 0;
+  }
+  
+  if (specs.handleType === 'TWISTED HANDLE' && machine.id === 'MACHINE_03') {
+    score += 10;
+  } else if (specs.handleType === 'FLAT HANDLE' && machine.id === 'MACHINE_01') {
+    score += 5;
+  }
+  
+  if (bagQuantity > 50000) {
+    score += 5 * (machine.capacity / 15000);
+  }
+  
+  return Math.max(0, score);
+}
+
+function findAvailableMachine(specs: any, machines: MachineSpec[], deliveryDays: number = 14, bagQuantity: number = 1000): {machine: MachineSpec | null, scheduledEndTime: Date | null} {
   const compatibleMachines = machines.filter(machine => {
     return specs.width <= machine.maxWidth &&
            specs.height <= machine.maxHeight &&
@@ -491,19 +533,26 @@ function findAvailableMachine(specs: any, machines: MachineSpec[], deliveryDays:
     return { machine: null, scheduledEndTime: null };
   }
   
-  // Sort by next available time (earliest first)
-  compatibleMachines.sort((a, b) => a.nextAvailableTime.getTime() - b.nextAvailableTime.getTime());
+  const machineScores = compatibleMachines.map(machine => ({
+    machine,
+    score: calculateMachineScore(machine, specs, bagQuantity, deliveryDays, machines)
+  }));
   
-  // Check if the earliest available machine can meet delivery deadline
-  const selectedMachine = compatibleMachines[0];
-  const deliveryDeadline = new Date();
-  deliveryDeadline.setDate(deliveryDeadline.getDate() + deliveryDays);
+  const viableMachines = machineScores.filter(item => item.score > 0);
   
-  if (selectedMachine.nextAvailableTime > deliveryDeadline) {
+  if (viableMachines.length === 0) {
     return { machine: null, scheduledEndTime: null };
   }
   
-  return { machine: selectedMachine, scheduledEndTime: null };
+  viableMachines.sort((a, b) => b.score - a.score);
+  
+  const selectedMachine = viableMachines[0].machine;
+  
+  const productionHours = Math.ceil(bagQuantity / selectedMachine.capacity);
+  const scheduledEndTime = new Date(selectedMachine.nextAvailableTime.getTime() + productionHours * 60 * 60 * 1000);
+  
+  
+  return { machine: selectedMachine, scheduledEndTime };
 }
 
 // Helper function to schedule production on machine
@@ -1451,8 +1500,10 @@ async function processOrdersWithSequentialInventory(orders: any[]): Promise<{res
       // Check inventory against running totals
       const inventoryCheck = checkInventoryWithRunningTotal(orderAnalysis.bom, runningInventory);
       
-      // Check machine availability
-      const machineCheck = findAvailableMachine(orderAnalysis.specs, machineFleet, order.deliveryDays || 14);
+      // Only check machine availability if inventory is feasible
+      const machineCheck = inventoryCheck.feasible 
+        ? findAvailableMachine(orderAnalysis.specs, machineFleet, order.deliveryDays || 14, orderAnalysis.actualBags)
+        : { machine: null, scheduledEndTime: null };
       
       const isFeasible = inventoryCheck.feasible && machineCheck.machine !== null;
       
@@ -1473,13 +1524,11 @@ async function processOrdersWithSequentialInventory(orders: any[]): Promise<{res
       
       // If feasible, actually consume inventory and schedule machine
       if (isFeasible) {
-        console.log(`✅ Order ${orderIndex} is FEASIBLE - Consuming materials and scheduling production`);
         
         // Consume inventory
         for (const consumption of inventoryCheck.consumedMaterials) {
           const currentStock = runningInventory.get(consumption.sapCode) || 0;
           runningInventory.set(consumption.sapCode, currentStock - consumption.consumed);
-          console.log(`   📉 ${consumption.description}: ${currentStock} → ${currentStock - consumption.consumed}`);
         }
         
         // Schedule machine production
@@ -1492,7 +1541,6 @@ async function processOrdersWithSequentialInventory(orders: any[]): Promise<{res
           orderResult.productionSchedule = schedule;
           productionSchedule.push(schedule);
           
-          console.log(`   🏭 Scheduled on ${machineCheck.machine.name}: ${schedule.startTime.toLocaleDateString()} - ${schedule.endTime.toLocaleDateString()}`);
         }
         
         totalProcessedCost += orderAnalysis.totalCost;
@@ -1720,7 +1768,7 @@ async function calculateOrderAnalysisWithoutInventoryCheck(order: any) {
       sapCode: MATERIAL_DATABASE.PATCH.FLAT.sapCode,
       description: MATERIAL_DATABASE.PATCH.FLAT.description,
       quantity: patchWeight,
-      totalQuantity: patchWeight * actualBags,
+      totalQuantity: Math.round((patchWeight * actualBags) * 1000) / 1000,
       unit: 'KG',
       unitPrice: materialPrices[MATERIAL_DATABASE.PATCH.FLAT.sapCode] || 4.8,
       totalCost: (patchWeight * actualBags) * (materialPrices[MATERIAL_DATABASE.PATCH.FLAT.sapCode] || 4.8)
@@ -1758,7 +1806,7 @@ async function calculateOrderAnalysisWithoutInventoryCheck(order: any) {
       sapCode: MATERIAL_DATABASE.PATCH.TWISTED.sapCode,
       description: MATERIAL_DATABASE.PATCH.TWISTED.description,
       quantity: patchWeight,
-      totalQuantity: patchWeight * actualBags,
+      totalQuantity: Math.round((patchWeight * actualBags) * 1000) / 1000,
       unit: 'KG',
       unitPrice: materialPrices[MATERIAL_DATABASE.PATCH.TWISTED.sapCode] || 5.2,
       totalCost: (patchWeight * actualBags) * (materialPrices[MATERIAL_DATABASE.PATCH.TWISTED.sapCode] || 5.2)
@@ -1948,7 +1996,7 @@ async function calculateOrderAnalysis(order: any) {
       sapCode: MATERIAL_DATABASE.PATCH.FLAT.sapCode,
       description: MATERIAL_DATABASE.PATCH.FLAT.description,
       quantity: patchWeight,
-      totalQuantity: patchWeight * actualBags,
+      totalQuantity: Math.round((patchWeight * actualBags) * 1000) / 1000,
       unit: 'KG',
       unitPrice: materialPrices[MATERIAL_DATABASE.PATCH.FLAT.sapCode] || 4.8,
       totalCost: (patchWeight * actualBags) * (materialPrices[MATERIAL_DATABASE.PATCH.FLAT.sapCode] || 4.8)
@@ -1986,7 +2034,7 @@ async function calculateOrderAnalysis(order: any) {
       sapCode: MATERIAL_DATABASE.PATCH.TWISTED.sapCode,
       description: MATERIAL_DATABASE.PATCH.TWISTED.description,
       quantity: patchWeight,
-      totalQuantity: patchWeight * actualBags,
+      totalQuantity: Math.round((patchWeight * actualBags) * 1000) / 1000,
       unit: 'KG',
       unitPrice: materialPrices[MATERIAL_DATABASE.PATCH.TWISTED.sapCode] || 5.2,
       totalCost: (patchWeight * actualBags) * (materialPrices[MATERIAL_DATABASE.PATCH.TWISTED.sapCode] || 5.2)

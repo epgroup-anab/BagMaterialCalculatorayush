@@ -212,9 +212,9 @@ export default function InventoryCalculator() {
       const inventoryItem = INVENTORY_DATA[item.sapCode as keyof typeof INVENTORY_DATA];
       if (!inventoryItem) return;
 
-      const required = item.quantity * actualBags;
+      const required = Math.round((item.quantity * actualBags) * 1000) / 1000;
       const available = stockData[item.sapCode] ?? 0;
-      const shortage = Math.max(0, required - available);
+      const shortage = Math.max(0, Math.round((required - available) * 1000) / 1000);
       const cost = required * inventoryItem.price;
       
       let status: 'sufficient' | 'low' | 'critical' = 'sufficient';

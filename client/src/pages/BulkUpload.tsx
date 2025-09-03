@@ -77,35 +77,9 @@ export default function BulkUpload() {
     }
   };
 
-  const handleExport = async (format: 'html' | 'pdf') => {
+  const handleExport = () => {
     if (!results?.id) return;
-
-    try {
-      if (format === 'html') {
-        // Open HTML report in new window/tab
-        window.open(`/api/bulk-orders/${results.id}/export/html`, '_blank');
-      } else {
-        // Keep PDF as download
-        const response = await fetch(`/api/bulk-orders/${results.id}/export/${format}`);
-        
-        if (!response.ok) {
-          throw new Error(`Export failed: ${response.statusText}`);
-        }
-
-        // Trigger download
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `bulk-order-${results.id}.${format}`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Export failed');
-    }
+    window.open(`/api/bulk-orders/${results.id}/export/html`, '_blank');
   };
 
   return (
@@ -178,24 +152,14 @@ export default function BulkUpload() {
                 </Button>
 
                 {results && (
-                  <>
-                    <Button 
-                      variant="outline"
-                      onClick={() => handleExport('html')}
-                      className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
-                    >
-                      <FileText className="w-4 h-4 mr-2" />
-                      View Report
-                    </Button>
-                    <Button 
-                      variant="outline"
-                      onClick={() => handleExport('pdf')}
-                      className="bg-red-50 border-red-200 text-red-700 hover:bg-red-100"
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Export PDF
-                    </Button>
-                  </>
+                  <Button 
+                    variant="outline"
+                    onClick={handleExport}
+                    className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    View Report
+                  </Button>
                 )}
               </div>
             </div>

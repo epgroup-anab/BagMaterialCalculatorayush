@@ -295,9 +295,9 @@ export default function CombinedCalculator() {
 
     bomItems.forEach(item => {
       const currentStock = stockData[item.sapCode] || 0;
-      const required = item.quantity * actualBags;
+      const required = Math.round((item.quantity * actualBags) * 1000) / 1000;
       const available = currentStock;
-      const shortage = Math.max(0, required - available);
+      const shortage = Math.max(0, Math.round((required - available) * 1000) / 1000);
       const estimatedPrice = 10; // Default price since we don't have inventory data
       const cost = required * estimatedPrice;
       

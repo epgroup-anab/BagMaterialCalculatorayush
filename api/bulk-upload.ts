@@ -397,7 +397,6 @@ interface MachineSchedule {
   bagQuantity: number;
 }
 
-// Initialize machine fleet
 function initializeMachineFleet(): MachineSpec[] {
   const baseTime = new Date();
   
@@ -477,8 +476,50 @@ function checkInventoryWithRunningTotal(bom: any[], runningInventory: Map<string
   };
 }
 
-// Helper function to find available machine for order specs
-function findAvailableMachine(specs: any, machines: MachineSpec[], deliveryDays: number = 14): {machine: MachineSpec | null, scheduledEndTime: Date | null} {
+function calculateMachineScore(machine: MachineSpec, specs: any, bagQuantity: number, deliveryDays: number, allMachines: MachineSpec[]): number {
+  let score = 0;
+  
+  const productionHours = bagQuantity / machine.capacity;
+  const optimalProductionHours = 8;
+  
+  if (productionHours <= optimalProductionHours) {
+    score += 40 * (productionHours / optimalProductionHours);
+  } else {
+    score += 40 * (optimalProductionHours / productionHours);
+  }
+  
+  const currentTime = new Date();
+  const hoursUntilAvailable = Math.max(0, (machine.nextAvailableTime.getTime() - currentTime.getTime()) / (1000 * 60 * 60));
+  const avgBusyTime = allMachines.reduce((sum, m) => sum + Math.max(0, (m.nextAvailableTime.getTime() - currentTime.getTime()) / (1000 * 60 * 60)), 0) / allMachines.length;
+  
+  const utilizationScore = avgBusyTime > 0 ? Math.max(0, 25 * (1 - (hoursUntilAvailable / avgBusyTime))) : 25;
+  score += utilizationScore;
+  
+  const deliveryDeadline = new Date();
+  deliveryDeadline.setDate(deliveryDeadline.getDate() + deliveryDays);
+  const completionTime = new Date(machine.nextAvailableTime.getTime() + productionHours * 60 * 60 * 1000);
+  
+  if (completionTime <= deliveryDeadline) {
+    const timeBuffer = (deliveryDeadline.getTime() - completionTime.getTime()) / (1000 * 60 * 60 * 24);
+    score += 20 * Math.min(1, timeBuffer / 2);
+  } else {
+    score = 0;
+  }
+  
+  if (specs.handleType === 'TWISTED HANDLE' && machine.id === 'MACHINE_03') {
+    score += 10;
+  } else if (specs.handleType === 'FLAT HANDLE' && machine.id === 'MACHINE_01') {
+    score += 5;
+  }
+  
+  if (bagQuantity > 50000) {
+    score += 5 * (machine.capacity / 15000);
+  }
+  
+  return Math.max(0, score);
+}
+
+function findAvailableMachine(specs: any, machines: MachineSpec[], deliveryDays: number = 14, bagQuantity: number = 1000): {machine: MachineSpec | null, scheduledEndTime: Date | null} {
   const compatibleMachines = machines.filter(machine => {
     return specs.width <= machine.maxWidth &&
            specs.height <= machine.maxHeight &&
@@ -492,19 +533,26 @@ function findAvailableMachine(specs: any, machines: MachineSpec[], deliveryDays:
     return { machine: null, scheduledEndTime: null };
   }
   
-  // Sort by next available time (earliest first)
-  compatibleMachines.sort((a, b) => a.nextAvailableTime.getTime() - b.nextAvailableTime.getTime());
+  const machineScores = compatibleMachines.map(machine => ({
+    machine,
+    score: calculateMachineScore(machine, specs, bagQuantity, deliveryDays, machines)
+  }));
   
-  // Check if the earliest available machine can meet delivery deadline
-  const selectedMachine = compatibleMachines[0];
-  const deliveryDeadline = new Date();
-  deliveryDeadline.setDate(deliveryDeadline.getDate() + deliveryDays);
+  const viableMachines = machineScores.filter(item => item.score > 0);
   
-  if (selectedMachine.nextAvailableTime > deliveryDeadline) {
+  if (viableMachines.length === 0) {
     return { machine: null, scheduledEndTime: null };
   }
   
-  return { machine: selectedMachine, scheduledEndTime: null };
+  viableMachines.sort((a, b) => b.score - a.score);
+  
+  const selectedMachine = viableMachines[0].machine;
+  
+  const productionHours = Math.ceil(bagQuantity / selectedMachine.capacity);
+  const scheduledEndTime = new Date(selectedMachine.nextAvailableTime.getTime() + productionHours * 60 * 60 * 1000);
+  
+  
+  return { machine: selectedMachine, scheduledEndTime };
 }
 
 // Helper function to schedule production on machine
@@ -525,9 +573,7 @@ function scheduleProductionOnMachine(machine: MachineSpec, bagQuantity: number, 
   };
 }
 
-// Sequential processing with inventory deduction and machine scheduling
 async function processOrdersWithSequentialInventory(orders: any[]): Promise<{results: any[], summary: any}> {
-  console.log('🚀 Starting sequential order processing with inventory and machine planning...');
   
   // Initialize systems
   const runningInventory = await fetchAllInventory();
@@ -543,7 +589,6 @@ async function processOrdersWithSequentialInventory(orders: any[]): Promise<{res
     const order = orders[i];
     const orderIndex = i + 1;
     
-    console.log(`📦 Processing Order ${orderIndex}/${orders.length}: ${order.bagName}`);
     
     try {
       // Calculate BOM for this order
@@ -552,8 +597,10 @@ async function processOrdersWithSequentialInventory(orders: any[]): Promise<{res
       // Check inventory against running totals
       const inventoryCheck = checkInventoryWithRunningTotal(orderAnalysis.bom, runningInventory);
       
-      // Check machine availability
-      const machineCheck = findAvailableMachine(orderAnalysis.specs, machineFleet, order.deliveryDays || 14);
+      // Only check machine availability if inventory is feasible
+      const machineCheck = inventoryCheck.feasible 
+        ? findAvailableMachine(orderAnalysis.specs, machineFleet, order.deliveryDays || 14, orderAnalysis.actualBags)
+        : { machine: null, scheduledEndTime: null };
       
       const isFeasible = inventoryCheck.feasible && machineCheck.machine !== null;
       
@@ -612,7 +659,6 @@ async function processOrdersWithSequentialInventory(orders: any[]): Promise<{res
       results.push(orderResult);
       
     } catch (error) {
-      console.log(`💥 Error processing Order ${orderIndex}: ${error}`);
       results.push({
         ...order,
         processingOrder: orderIndex,
@@ -644,7 +690,6 @@ async function processOrdersWithSequentialInventory(orders: any[]): Promise<{res
     }))
   };
   
-  console.log(`🎯 Sequential processing complete: ${feasibleOrdersCount}/${orders.length} orders feasible`);
   
   return { results, summary };
 }
@@ -728,7 +773,7 @@ async function calculateOrderAnalysisWithoutInventoryCheck(order: any) {
   const overlapArea = (specs.width + specs.gusset) * 2;
   const totalAreaMm2 = frontBack + gussetArea + bottomArea + overlapArea;
   const paperWeightPerMm2 = specs.gsm / 1000000;
-  const paperWeightPerBag = (totalAreaMm2 * paperWeightPerMm2) / 1000; // kg per bag
+  const paperWeightPerBag = Math.round(((totalAreaMm2 * paperWeightPerMm2) / 1000) * 1000000) / 1000000;
   
   // Get paper info from material database
   const paperGradeData = MATERIAL_DATABASE.PAPER[specs.paperGrade as keyof typeof MATERIAL_DATABASE.PAPER];
@@ -740,29 +785,31 @@ async function calculateOrderAnalysisWithoutInventoryCheck(order: any) {
   
   // Paper
   if (paperInfo) {
+    const totalPaperQuantity = Math.round((paperWeightPerBag * actualBags) * 1000) / 1000;
     bom.push({
       type: 'PAPER',
       sapCode: paperInfo.sapCode,
       description: paperInfo.description,
       quantity: paperWeightPerBag,
-      totalQuantity: paperWeightPerBag * actualBags,
+      totalQuantity: totalPaperQuantity,
       unit: 'KG',
       unitPrice: materialPrices[paperInfo.sapCode] || 1.2,
-      totalCost: (paperWeightPerBag * actualBags) * (materialPrices[paperInfo.sapCode] || 1.2)
+      totalCost: Math.round((totalPaperQuantity * (materialPrices[paperInfo.sapCode] || 1.2)) * 100) / 100
     });
   }
 
   // Cold glue
   const coldGlueQty = 0.0018;
+  const totalColdGlueQuantity = Math.round((coldGlueQty * actualBags) * 1000) / 1000;
   bom.push({
     type: 'COLD GLUE',
     sapCode: MATERIAL_DATABASE.GLUE.COLD.sapCode,
     description: MATERIAL_DATABASE.GLUE.COLD.description,
     quantity: coldGlueQty,
-    totalQuantity: coldGlueQty * actualBags,
+    totalQuantity: totalColdGlueQuantity,
     unit: 'KG',
     unitPrice: materialPrices[MATERIAL_DATABASE.GLUE.COLD.sapCode] || 8.5,
-    totalCost: (coldGlueQty * actualBags) * (materialPrices[MATERIAL_DATABASE.GLUE.COLD.sapCode] || 8.5)
+    totalCost: Math.round((totalColdGlueQuantity * (materialPrices[MATERIAL_DATABASE.GLUE.COLD.sapCode] || 8.5)) * 100) / 100
   });
 
   // Handle materials
@@ -771,15 +818,18 @@ async function calculateOrderAnalysisWithoutInventoryCheck(order: any) {
     const patchWeight = 0.0012;
     const hotGlueQty = 0.0001;
     
+    const totalHandleQuantity = Math.round((handleWeight * actualBags) * 1000) / 1000;
+    const totalPatchQuantity = Math.round((patchWeight * actualBags) * 1000) / 1000;
+    
     bom.push({
       type: 'HANDLE',
       sapCode: MATERIAL_DATABASE.HANDLE.FLAT.sapCode,
       description: MATERIAL_DATABASE.HANDLE.FLAT.description,
       quantity: handleWeight,
-      totalQuantity: handleWeight * actualBags,
+      totalQuantity: totalHandleQuantity,
       unit: 'KG',
       unitPrice: materialPrices[MATERIAL_DATABASE.HANDLE.FLAT.sapCode] || 3.5,
-      totalCost: (handleWeight * actualBags) * (materialPrices[MATERIAL_DATABASE.HANDLE.FLAT.sapCode] || 3.5)
+      totalCost: Math.round((totalHandleQuantity * (materialPrices[MATERIAL_DATABASE.HANDLE.FLAT.sapCode] || 3.5)) * 100) / 100
     });
     
     bom.push({
@@ -787,21 +837,22 @@ async function calculateOrderAnalysisWithoutInventoryCheck(order: any) {
       sapCode: MATERIAL_DATABASE.PATCH.FLAT.sapCode,
       description: MATERIAL_DATABASE.PATCH.FLAT.description,
       quantity: patchWeight,
-      totalQuantity: patchWeight * actualBags,
+      totalQuantity: totalPatchQuantity,
       unit: 'KG',
       unitPrice: materialPrices[MATERIAL_DATABASE.PATCH.FLAT.sapCode] || 4.8,
-      totalCost: (patchWeight * actualBags) * (materialPrices[MATERIAL_DATABASE.PATCH.FLAT.sapCode] || 4.8)
+      totalCost: Math.round((totalPatchQuantity * (materialPrices[MATERIAL_DATABASE.PATCH.FLAT.sapCode] || 4.8)) * 100) / 100
     });
     
+    const totalHotGlueQuantity = Math.round((hotGlueQty * actualBags) * 1000000) / 1000000;
     bom.push({
       type: 'HOT GLUE',
       sapCode: MATERIAL_DATABASE.GLUE.HOT.sapCode,
       description: MATERIAL_DATABASE.GLUE.HOT.description,
       quantity: hotGlueQty,
-      totalQuantity: hotGlueQty * actualBags,
+      totalQuantity: totalHotGlueQuantity,
       unit: 'KG',
       unitPrice: materialPrices[MATERIAL_DATABASE.GLUE.HOT.sapCode] || 9.2,
-      totalCost: (hotGlueQty * actualBags) * (materialPrices[MATERIAL_DATABASE.GLUE.HOT.sapCode] || 9.2)
+      totalCost: Math.round((totalHotGlueQuantity * (materialPrices[MATERIAL_DATABASE.GLUE.HOT.sapCode] || 9.2)) * 100) / 100
     });
     
   } else if (specs.handleType === 'TWISTED HANDLE') {
@@ -809,15 +860,19 @@ async function calculateOrderAnalysisWithoutInventoryCheck(order: any) {
     const patchWeight = 0.0036;
     const hotGlueQty = 0.0011;
     
+    const totalTwistedHandleQuantity = Math.round((handleWeight * actualBags) * 1000) / 1000;
+    const totalTwistedPatchQuantity = Math.round((patchWeight * actualBags) * 1000) / 1000;
+    const totalTwistedHotGlueQuantity = Math.round((hotGlueQty * actualBags) * 1000000) / 1000000;
+    
     bom.push({
       type: 'HANDLE',
       sapCode: MATERIAL_DATABASE.HANDLE.TWISTED.sapCode,
       description: MATERIAL_DATABASE.HANDLE.TWISTED.description,
       quantity: handleWeight,
-      totalQuantity: handleWeight * actualBags,
+      totalQuantity: totalTwistedHandleQuantity,
       unit: 'KG',
       unitPrice: materialPrices[MATERIAL_DATABASE.HANDLE.TWISTED.sapCode] || 12.5,
-      totalCost: (handleWeight * actualBags) * (materialPrices[MATERIAL_DATABASE.HANDLE.TWISTED.sapCode] || 12.5)
+      totalCost: Math.round((totalTwistedHandleQuantity * (materialPrices[MATERIAL_DATABASE.HANDLE.TWISTED.sapCode] || 12.5)) * 100) / 100
     });
     
     bom.push({
@@ -825,10 +880,10 @@ async function calculateOrderAnalysisWithoutInventoryCheck(order: any) {
       sapCode: MATERIAL_DATABASE.PATCH.TWISTED.sapCode,
       description: MATERIAL_DATABASE.PATCH.TWISTED.description,
       quantity: patchWeight,
-      totalQuantity: patchWeight * actualBags,
+      totalQuantity: totalTwistedPatchQuantity,
       unit: 'KG',
       unitPrice: materialPrices[MATERIAL_DATABASE.PATCH.TWISTED.sapCode] || 5.2,
-      totalCost: (patchWeight * actualBags) * (materialPrices[MATERIAL_DATABASE.PATCH.TWISTED.sapCode] || 5.2)
+      totalCost: Math.round((totalTwistedPatchQuantity * (materialPrices[MATERIAL_DATABASE.PATCH.TWISTED.sapCode] || 5.2)) * 100) / 100
     });
     
     bom.push({
@@ -836,24 +891,25 @@ async function calculateOrderAnalysisWithoutInventoryCheck(order: any) {
       sapCode: MATERIAL_DATABASE.GLUE.HOT.sapCode,
       description: MATERIAL_DATABASE.GLUE.HOT.description,
       quantity: hotGlueQty,
-      totalQuantity: hotGlueQty * actualBags,
+      totalQuantity: totalTwistedHotGlueQuantity,
       unit: 'KG',
       unitPrice: materialPrices[MATERIAL_DATABASE.GLUE.HOT.sapCode] || 9.2,
-      totalCost: (hotGlueQty * actualBags) * (materialPrices[MATERIAL_DATABASE.GLUE.HOT.sapCode] || 9.2)
+      totalCost: Math.round((totalTwistedHotGlueQuantity * (materialPrices[MATERIAL_DATABASE.GLUE.HOT.sapCode] || 9.2)) * 100) / 100
     });
   }
 
   // Carton
   const cartonQty = 0.004;
+  const totalCartonQuantity = Math.round((cartonQty * actualBags) * 1000) / 1000;
   bom.push({
     type: 'CARTON',
     sapCode: MATERIAL_DATABASE.CARTON.STANDARD.sapCode,
     description: MATERIAL_DATABASE.CARTON.STANDARD.description,
     quantity: cartonQty,
-    totalQuantity: cartonQty * actualBags,
+    totalQuantity: totalCartonQuantity,
     unit: 'PC',
     unitPrice: materialPrices[MATERIAL_DATABASE.CARTON.STANDARD.sapCode] || 0.15,
-    totalCost: (cartonQty * actualBags) * (materialPrices[MATERIAL_DATABASE.CARTON.STANDARD.sapCode] || 0.15)
+    totalCost: Math.round((totalCartonQuantity * (materialPrices[MATERIAL_DATABASE.CARTON.STANDARD.sapCode] || 0.15)) * 100) / 100
   });
   
   const totalCost = bom.reduce((sum, item) => sum + item.totalCost, 0);

@@ -63,8 +63,6 @@ const BulkOrderSchema = new Schema<IBulkOrder>({
   }
 });
 
-// Create indexes for better query performance
-UserSchema.index({ username: 1 });
 BulkOrderSchema.index({ uploadedAt: -1 });
 BulkOrderSchema.index({ fileName: 1 });
 
