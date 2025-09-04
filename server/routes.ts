@@ -6,7 +6,7 @@ import { parse } from "csv-parse";
 import * as XLSX from "xlsx";
 import puppeteer from "puppeteer";
 import { z } from "zod";
-import { SKU_DATA } from "../client/src/data/skuData";
+import { SKU_DATA } from "../client/src/data/skuData.ts";
 
 interface MulterRequest extends Request {
   file?: Express.Multer.File;
