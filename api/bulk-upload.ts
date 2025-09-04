@@ -3,7 +3,6 @@ import multer from 'multer';
 import { parse } from 'csv-parse';
 import * as XLSX from 'xlsx';
 import { z } from 'zod';
-// SKU_DATA import removed for serverless compatibility
 
 import mongoose, { Document, Schema } from 'mongoose';
 
@@ -182,17 +181,6 @@ function parseNumericValue(value: any): number | null {
   return null;
 }
 
-function cleanStringValue(value: any): string | null {
-  if (value === null || value === undefined) return null;
-  
-  const str = value.toString().trim();
-  if (str === '' || str === '#VALUE!' || str === '#DIV/0!' || str === '#N/A' || str === 'undefined' || str === 'null') {
-    return null;
-  }
-  
-  return str;
-}
-
 function getBagSpecsFromSAPCode(sapCode: string): any {
   // Specs mapping based on your PSL data (serverless-compatible)
   const commonSpecs: Record<string, any> = {
@@ -238,512 +226,55 @@ function getBagSpecsFromSAPCode(sapCode: string): any {
   };
 }
 
-function isPSLFormat(data: any[]): boolean {
-  if (!data || data.length < 2) return false;
-  
-  const firstRow = data[0];
-  const allKeys = Object.keys(firstRow || {}).join('|').toLowerCase();
-  
-  const hasSAPCode = allKeys.includes('sap code');
-  const hasDesc = allKeys.includes('desc');
-  const hasPaper = allKeys.includes('paper');
-  const hasMonthlyReq = allKeys.includes('monthly requirement');
-  const hasMonthData = allKeys.includes('requirement') && 
-                      (allKeys.includes('aug') || allKeys.includes('sept') || allKeys.includes('oct'));
-  
-  return hasSAPCode && hasDesc && hasPaper && hasMonthlyReq && hasMonthData;
-}
-
-// Robust Excel data cleaning function
-function cleanExcelData(rawRows: any[][]): any[] {
-  if (!rawRows || rawRows.length < 2) return [];
-  
-  console.log('🧹 Starting Excel data cleaning...');
-  console.log(`📊 Input: ${rawRows.length} raw rows`);
-  
-  // Find header row by looking for key PSL indicators
-  // PSL format: Row 1 = month names, Row 2 = actual headers, Row 3+ = data
-  let headerRowIndex = -1;
-  let dataStartIndex = -1;
-  
-  for (let i = 0; i < Math.min(5, rawRows.length); i++) {
-    const row = rawRows[i];
-    if (Array.isArray(row)) {
-      // Look for PSL header patterns in row content
-      const rowText = row.join('|').toLowerCase();
-      if (rowText.includes('sap code') && rowText.includes('desc') && rowText.includes('paper')) {
-        headerRowIndex = i;
-        dataStartIndex = i + 1;
-        console.log(`🎯 Found PSL header at row ${i + 1} (Excel row ${i + 1})`);
-        
-        // Log the month row if it exists (should be row before header)
-        if (i > 0) {
-          console.log(`📅 Month row at row ${i}: ${rawRows[i - 1].join(', ')}`);
-        }
-        break;
-      }
-    }
-  }
-  
-  if (headerRowIndex === -1) {
-    console.log('⚠️ No PSL header found, using smart column detection...');
-    return smartColumnMapping(rawRows);
-  }
-  
-  const headerRow = rawRows[headerRowIndex];
-  const dataRows = rawRows.slice(dataStartIndex);
-  
-  console.log('📋 Header row:', headerRow);
-  console.log(`📊 Processing ${dataRows.length} data rows`);
-  
-  // Map column indices for PSL format
-  const columnMap = {
-    bagType: -1,        // Column A: bag type (NL2, G4, etc.)
-    sapCode: -1,        // Column B: SAP Code
-    description: -1,    // Column C: Description
-    paper: -1,          // Column D: Paper width
-    monthlyReq: -1,     // Column E: Monthly Requirement
-    weeklyUsage: -1,    // Column F: Weekly Usage
-    bagsPerCarton: -1   // Column G: No of Bags
-  };
-  
-  // Find column positions
-  headerRow.forEach((header: any, index: number) => {
-    const headerStr = (header || '').toString().toLowerCase().trim();
-    
-    if (headerStr.includes('sap code')) columnMap.sapCode = index;
-    else if (headerStr.includes('desc')) columnMap.description = index;
-    else if (headerStr.includes('paper')) columnMap.paper = index;
-    else if (headerStr.includes('monthly requirement')) columnMap.monthlyReq = index;
-    else if (headerStr.includes('weekly usage')) columnMap.weeklyUsage = index;
-    else if (headerStr.includes('no of bags')) columnMap.bagsPerCarton = index;
-  });
-  
-  // Bag type is typically in column A (index 0)
-  columnMap.bagType = 0;
-  
-  console.log('🗺️ Column mapping:', columnMap);
-  
-  const cleanedOrders: any[] = [];
-  
-  dataRows.forEach((row: any[], rowIndex: number) => {
-    try {
-      if (!Array.isArray(row) || row.length === 0) return;
-      
-      // Extract data using column mapping
-      const bagType = cleanValue(row[columnMap.bagType]);
-      const sapCode = cleanValue(row[columnMap.sapCode]);
-      const description = cleanValue(row[columnMap.description]);
-      const paper = parseNumericValue(row[columnMap.paper]);
-      const monthlyReq = parseNumericValue(row[columnMap.monthlyReq]);
-      const bagsPerCarton = parseNumericValue(row[columnMap.bagsPerCarton]) || (monthlyReq > 0 ? Math.floor(monthlyReq) : 1000);
-      
-      // Skip rows with insufficient data
-      if (!sapCode || !description || !monthlyReq || monthlyReq <= 0) {
-        console.log(`⏭️ Skipping row ${rowIndex + dataStartIndex + 1}: insufficient data`);
-        return;
-      }
-      
-      // Skip MTO (Made To Order) items
-      if (description.toString().toLowerCase().includes('mto') || monthlyReq.toString().toLowerCase().includes('mto')) {
-        console.log(`⏭️ Skipping MTO item: ${description}`);
-        return;
-      }
-      
-      // Get bag specifications from SAP code
-      const bagSpecs = getBagSpecsFromSAPCode(sapCode.toString());
-      const finalBagName = description.toString().trim(); // Don't include bagType in name
-      const totalBags = monthlyReq * bagsPerCarton;
-      
-      console.log(`✅ Processing: ${finalBagName} - SAP: ${sapCode} - ${monthlyReq} cartons (${totalBags} bags)`);
-      
-      cleanedOrders.push({
-        bagName: finalBagName,
-        sku: sapCode.toString(),
-        orderQty: monthlyReq,
-        orderUnit: 'cartons',
-        
-        // Use specifications from SAP code lookup
-        width: bagSpecs.width,
-        gusset: bagSpecs.gusset,
-        height: bagSpecs.height,
-        gsm: bagSpecs.gsm,
-        handleType: bagSpecs.handleType,
-        paperGrade: bagSpecs.paperGrade,
-        certification: bagSpecs.cert,
-        
-        // PSL-specific metadata
-        originalSAPCode: sapCode,
-        cartonsRequired: monthlyReq,
-        bagsPerCarton: bagsPerCarton,
-        totalBags: totalBags,
-        rollWidth: paper || null,
-        
-        // Source tracking
-        sourceRow: rowIndex + dataStartIndex + 1,
-        sourceFormat: 'PSL_CLEANED'
-      });
-      
-    } catch (error) {
-      console.error(`❌ Error processing row ${rowIndex + dataStartIndex + 1}:`, error);
-    }
-  });
-  
-  console.log(`✅ Cleaned Excel data: ${rawRows.length} rows → ${cleanedOrders.length} valid orders`);
-  return cleanedOrders;
-}
-
-// Smart column mapping for non-standard Excel files
-function smartColumnMapping(rawRows: any[][]): any[] {
-  console.log('🤖 Using smart column detection for non-standard Excel format...');
-  
-  if (rawRows.length < 2) return [];
-  
-  // Look for numeric SAP codes and descriptions in the first few rows
-  const cleanedOrders: any[] = [];
-  
-  rawRows.forEach((row: any[], rowIndex: number) => {
-    try {
-      if (!Array.isArray(row) || row.length < 3) return;
-      
-      // Try to find SAP code (should be numeric, 5-6 digits)
-      let sapCode = null;
-      let description = null;
-      let quantity = null;
-      
-      for (let colIndex = 0; colIndex < Math.min(10, row.length); colIndex++) {
-        const value = cleanValue(row[colIndex]);
-        
-        // Look for SAP code pattern (5-6 digit numbers)
-        if (typeof value === 'number' && value >= 10000 && value <= 999999) {
-          sapCode = value;
-        }
-        
-        // Look for descriptions (non-empty strings that aren't numbers)
-        if (typeof value === 'string' && value.length > 2 && !value.match(/^\d+$/)) {
-          description = value;
-        }
-        
-        // Look for quantities (numbers > 10)
-        if (typeof value === 'number' && value > 10 && value < 1000000) {
-          quantity = value;
-        }
-      }
-      
-      // If we found essential data, create an order
-      if (sapCode && description && quantity) {
-        const bagSpecs = getBagSpecsFromSAPCode(sapCode.toString());
-        const finalBagName = description;
-        
-        console.log(`🔍 Smart detected: ${finalBagName} - SAP: ${sapCode} - Qty: ${quantity}`);
-        
-        cleanedOrders.push({
-          bagName: finalBagName,
-          sku: sapCode.toString(),
-          orderQty: quantity,
-          orderUnit: 'cartons',
-          
-          // Use specifications from SAP code lookup
-          width: bagSpecs.width,
-          gusset: bagSpecs.gusset,
-          height: bagSpecs.height,
-          gsm: bagSpecs.gsm,
-          handleType: bagSpecs.handleType,
-          paperGrade: bagSpecs.paperGrade,
-          certification: bagSpecs.cert,
-          
-          // Metadata
-          originalSAPCode: sapCode,
-          cartonsRequired: quantity,
-          bagsPerCarton: 250, // default
-          totalBags: quantity * 250,
-          
-          // Source tracking
-          sourceRow: rowIndex + 1,
-          sourceFormat: 'SMART_DETECTED'
-        });
-      }
-      
-    } catch (error) {
-      console.error(`❌ Error in smart detection for row ${rowIndex + 1}:`, error);
-    }
-  });
-  
-  console.log(`🤖 Smart detection: ${rawRows.length} rows → ${cleanedOrders.length} detected orders`);
-  return cleanedOrders;
-}
-
-// PSL Format Detection and Conversion Functions
-function isPSLFormat(data: any[]): boolean {
-  if (!data || data.length < 2) return false; // Need at least 2 rows
-  
-  const firstRow = data[0];
-  console.log('🔍 PSL Format detection - First row keys:', Object.keys(firstRow || {}));
-  console.log('🔍 PSL Format detection - First row sample:', {
-    key0: Object.keys(firstRow || {})[0],
-    key1: Object.keys(firstRow || {})[1], 
-    key2: Object.keys(firstRow || {})[2],
-    key3: Object.keys(firstRow || {})[3],
-    key4: Object.keys(firstRow || {})[4]
-  });
-  
-  // For CSV files, the headers become the object keys directly
-  // For Excel files, headers are in __EMPTY_X format
-  const allKeys = Object.keys(firstRow || {}).join('|').toLowerCase();
-  
-  // Check for PSL header patterns
-  const hasSAPCode = allKeys.includes('sap code');
-  const hasDesc = allKeys.includes('desc');
-  const hasPaper = allKeys.includes('paper');
-  const hasMonthlyReq = allKeys.includes('monthly requirement');
-  const hasMonthData = allKeys.includes('requirement') && 
-                      (allKeys.includes('aug') || allKeys.includes('sept') || allKeys.includes('oct'));
-  
-  const isPSL = hasSAPCode && hasDesc && hasPaper && hasMonthlyReq && hasMonthData;
-  
-  console.log('🔍 PSL Format check:', {
-    hasSAPCode,
-    hasDesc,
-    hasPaper,
-    hasMonthlyReq,
-    hasMonthData,
-    isPSL,
-    allKeys: allKeys.substring(0, 200) + '...'
-  });
-  
-  return isPSL;
-}
-
-function convertPSLToInternalFormat(pslData: any[]): any[] {
-  if (!pslData || pslData.length < 1) return [];
-  
-  const firstRow = pslData[0];
-  console.log(`📊 PSL Conversion: Processing ${pslData.length} data rows`);
-  
-  // Find all requirement columns with enhanced detection
-  const requirementColumns: string[] = [];
-  Object.keys(firstRow).forEach(key => {
-    const keyLower = key.toLowerCase().trim();
-    
-    // Enhanced matching for various PSL requirement column formats
-    const isRequirementColumn = keyLower.includes('requirement') || // Aug Requirement, Oct Requirement etc.
-                               keyLower.includes('req') || // Short form: Aug Req, Oct Req
-                               /^[a-z]{3}$/.test(keyLower) || // Oct, Nov etc.
-                               /^[a-z]{3}\s+requirement$/i.test(keyLower) || // "Oct Requirement"
-                               /^[a-z]{3}\s+req$/i.test(keyLower) || // "Oct Req"
-                               /^\d{4}-\d{2}$/.test(keyLower) || // 2024-10, 2024-11 format
-                               /^[a-z]{3,9}\s*\d{4}$/i.test(keyLower); // October 2024, Nov 2024
-    
-    if (isRequirementColumn && 
-        !keyLower.includes('sap') && 
-        !keyLower.includes('desc') && 
-        !keyLower.includes('paper') && 
-        !keyLower.includes('weekly') && 
-        !keyLower.includes('bags') && 
-        !keyLower.includes('monthly requirement') && // Exclude the generic "monthly requirement" field
-        keyLower !== '') {
-      requirementColumns.push(key);
-      console.log(`📅 Found requirement column: "${key}" (normalized: "${keyLower}")`);
-    }
-  });
-  
-  console.log(`📊 Found ${requirementColumns.length} requirement columns`);
-  
-  let allOrders: any[] = [];
-  
-  // Process each PSL data row
-  pslData.forEach((pslRow, rowIndex) => {
-    try {
-      // For CSV files, the column headers become keys directly
-      // Extract basic PSL data using the actual column names from CSV
-      const firstKey = Object.keys(pslRow)[0]; // This should be the bag type column
-      const sapCodeKey = Object.keys(pslRow).find(key => key.toLowerCase().includes('sap code'));
-      const descKey = Object.keys(pslRow).find(key => key.toLowerCase().includes('desc'));
-      const paperKey = Object.keys(pslRow).find(key => key.toLowerCase().includes('paper'));
-      const monthlyReqKey = Object.keys(pslRow).find(key => key.toLowerCase().includes('monthly requirement'));
-      const weeklyUsageKey = Object.keys(pslRow).find(key => key.toLowerCase().includes('weekly usage'));
-      const bagsKey = Object.keys(pslRow).find(key => key.toLowerCase().includes('no of bags'));
-      
-      const bagType = cleanValue(pslRow[firstKey]);
-      const sapCode = cleanValue(pslRow[sapCodeKey || '']);
-      const productName = cleanValue(pslRow[descKey || '']);
-      const rollWidth = parseNumericValue(pslRow[paperKey || '']);
-      const monthlyCartons = parseNumericValue(pslRow[monthlyReqKey || '']);
-      const weeklyUsage = parseNumericValue(pslRow[weeklyUsageKey || '']);
-      const bagsPerCarton = parseNumericValue(pslRow[bagsKey || '']) || 1000; // Avoid hardcoded 250
-      
-      console.log(`🔍 Row ${rowIndex + 1}: BagType="${bagType}", SAP="${sapCode}", Product="${productName}"`);
-      
-      // Enhanced validation for data integrity
-      if (!sapCode || !productName) {
-        console.log(`⏭️ Row ${rowIndex + 1}: Skipping - missing SAP code="${sapCode}" or product name="${productName}"`);
-        return;
-      }
-      
-      // Skip MTO (Made To Order) items and invalid entries
-      if (productName.toString().toLowerCase().includes('mto') ||
-          sapCode.toString().toLowerCase().includes('mto')) {
-        console.log(`⏭️ Skipping MTO item: ${productName} (SAP: ${sapCode})`);
-        return;
-      }
-      
-      // Skip header/invalid rows
-      if (productName.toString().toLowerCase().trim() === 'desc' ||
-          sapCode.toString().toLowerCase().trim() === 'sap code') {
-        console.log(`⏭️ Skipping header row: ${productName} (SAP: ${sapCode})`);
-        return;
-      }
-      
-      // Calculate total bags across all requirement columns
-      let totalBagsRequired = 0;
-      const monthlyBreakdown: any = {};
-      
-      requirementColumns.forEach(reqColumn => {
-        const bagsInMonth = parseNumericValue(pslRow[reqColumn]) || 0;
-        if (bagsInMonth > 0) {
-          monthlyBreakdown[reqColumn] = bagsInMonth;
-          totalBagsRequired += bagsInMonth;
-          console.log(`   📅 ${reqColumn}: ${bagsInMonth.toLocaleString()} bags`);
-        }
-      });
-      
-      // If no requirement columns have data, use the monthly cartons as fallback
-      if (totalBagsRequired === 0 && monthlyCartons > 0) {
-        totalBagsRequired = monthlyCartons * bagsPerCarton;
-        console.log(`   🔄 Using fallback: ${monthlyCartons} cartons × ${bagsPerCarton} bags = ${totalBagsRequired} total bags`);
-      }
-      
-      if (totalBagsRequired <= 0) {
-        console.log(`⏭️ Row ${rowIndex + 1}: No valid requirements found`);
-        return;
-      }
-      
-      console.log(`✅ Processing PSL row: ${productName} - Total: ${totalBagsRequired.toLocaleString()} bags`);
-      
-      // Get bag specifications from SAP code
-      const bagSpecs = getBagSpecsFromSAPCode(sapCode.toString());
-      const finalBagName = productName.toString().trim(); // Don't include bagType in name
-      
-      allOrders.push({
-        bagName: finalBagName,
-        sku: sapCode.toString(),
-        orderQty: totalBagsRequired, // Total bags across all months
-        orderUnit: 'bags', // Changed to bags since we're totaling actual bag requirements
-        
-        // Use specifications from SAP code lookup
-        width: bagSpecs.width,
-        gusset: bagSpecs.gusset,
-        height: bagSpecs.height,
-        gsm: bagSpecs.gsm,
-        handleType: bagSpecs.handleType,
-        paperGrade: bagSpecs.paperGrade,
-        certification: bagSpecs.cert,
-        
-        // PSL-specific metadata for tracking
-        rollWidth: rollWidth,
-        originalSAPCode: sapCode,
-        monthlyBreakdown: monthlyBreakdown,
-        totalBagsRequired: totalBagsRequired,
-        bagsPerCarton: bagsPerCarton,
-        weeklyUsage: weeklyUsage,
-        
-        // Source tracking
-        sourceRow: rowIndex + 1,
-        sourceFormat: 'PSL_WITH_TOTALS'
-      });
-      
-      console.log(`📦 Generated order: ${finalBagName}: ${totalBagsRequired.toLocaleString()} bags total`);
-      
-    } catch (error) {
-      console.error(`❌ Error processing PSL row ${rowIndex + 1}:`, error);
-    }
-  });
-  
-  console.log(`✅ Converted PSL data: ${pslData.length} rows → ${allOrders.length} valid orders`);
-  if (allOrders.length > 0) {
-    console.log(`📊 Total bags across all orders: ${allOrders.reduce((sum, order) => sum + order.totalBagsRequired, 0).toLocaleString()}`);
-  }
-  return allOrders;
-}
-
-// Specialized function for PSL CSV format parsing
 function convertPSLCSVToInternalFormat(rawRows: any[][]): any[] {
   if (!rawRows || rawRows.length < 3) return [];
-  
-  // PSL CSV structure:
-  // Row 0: Month names (Aug Requirement, Sept Requirement, etc.)
-  // Row 1: Headers (28-Aug, Sap Code, Desc, Paper, Monthly Requirement, etc.)
-  // Row 2+: Data (NL2, 35718, ALDI, 990, 5000, etc.)
   
   const monthRow = rawRows[0];
   const headerRow = rawRows[1];
   const dataRows = rawRows.slice(2);
   
-  console.log(`📊 PSL CSV Structure: ${dataRows.length} data rows`);
-  console.log('📅 Month row:', monthRow.slice(0, 15));
-  console.log('📋 Header row:', headerRow.slice(0, 10));
-  
-  // Find requirement column indices - enhanced detection for PSL format
   const requirementColumnIndices: number[] = [];
   monthRow.forEach((header: any, index: number) => {
     const headerStr = header ? header.toString().trim().toLowerCase() : '';
     
-    // Enhanced matching for various PSL formats
-    const isMonthColumn = headerStr.includes('requirement') || // Aug Requirement, Oct Requirement etc.
-                         headerStr.includes('req') || // Short form: Aug Req, Oct Req etc.
-                         /^\d{2}-[a-z]{3}$/.test(headerStr) || // 04-aug, 11-aug format
-                         /^[a-z]{3}$/.test(headerStr) || // Oct, Nov etc.
-                         /^[a-z]{3}\s+requirement$/i.test(headerStr) || // "Oct Requirement", "Nov Requirement"
-                         /^[a-z]{3}\s+req$/i.test(headerStr) || // "Oct Req", "Nov Req"
-                         /^\d{4}-\d{2}$/.test(headerStr) || // 2024-10, 2024-11 format
-                         /^[a-z]{3,9}\s*\d{4}$/i.test(headerStr); // October 2024, Nov 2024 etc.
+    const isMonthColumn = headerStr.includes('requirement') ||
+                         headerStr.includes('req') ||
+                         /^\d{2}-[a-z]{3}$/.test(headerStr) ||
+                         /^[a-z]{3}$/.test(headerStr) ||
+                         /^[a-z]{3}\s+requirement$/i.test(headerStr) ||
+                         /^[a-z]{3}\s+req$/i.test(headerStr) ||
+                         /^\d{4}-\d{2}$/.test(headerStr) ||
+                         /^[a-z]{3,9}\s*\d{4}$/i.test(headerStr);
     
     if (isMonthColumn && headerStr !== '' && headerStr !== 'sap code' && headerStr !== 'desc') {
       requirementColumnIndices.push(index);
-      console.log(`📅 Found requirement column at index ${index}: "${header}" (normalized: "${headerStr}")`);
     }
   });
   
-  console.log(`📊 Found ${requirementColumnIndices.length} requirement columns`);
-  
   let allOrders: any[] = [];
-  let processedCount = 0;
-  let skippedCount = 0;
   
-  // Process each data row
   dataRows.forEach((row: any[], rowIndex: number) => {
     try {
       if (!Array.isArray(row) || row.length < 5) {
-        skippedCount++;
         return;
       }
       
-      // Extract basic data based on CSV structure
-      const bagType = cleanValue(row[0]); // Column A
-      const sapCode = cleanValue(row[1]); // Column B  
-      const productName = cleanValue(row[2]); // Column C
-      const rollWidth = parseNumericValue(row[3]); // Column D
-      const monthlyCartons = parseNumericValue(row[4]); // Column E
-      const weeklyUsage = parseNumericValue(row[5]); // Column F
-      const bagsPerCarton = parseNumericValue(row[6]) || 1000; // Column G - avoid hardcoded 250
+      const bagType = cleanValue(row[0]);
+      const sapCode = cleanValue(row[1]);
+      const productName = cleanValue(row[2]);
+      const rollWidth = parseNumericValue(row[3]);
+      const monthlyCartons = parseNumericValue(row[4]);
+      const weeklyUsage = parseNumericValue(row[5]);
+      const bagsPerCarton = parseNumericValue(row[6]) || 1000;
       
-      console.log(`🔍 Row ${rowIndex + 3}: "${bagType}" | SAP=${sapCode} | "${productName}" | Paper=${rollWidth} | Monthly=${monthlyCartons}`);
-      
-      // Skip if missing essential data
       if (!sapCode || !productName || sapCode.toString().trim() === '' || productName.toString().trim() === '') {
-        console.log(`⏭️ Row ${rowIndex + 3}: Skipping - missing essential data`);
-        skippedCount++;
         return;
       }
       
-      // Skip MTO items
       if (productName.toString().toLowerCase().includes('mto')) {
-        console.log(`⏭️ Row ${rowIndex + 3}: Skipping MTO item: ${productName}`);
-        skippedCount++;
         return;
       }
       
-      // Calculate total bags from requirement columns
       let totalBagsRequired = 0;
       const monthlyBreakdown: any = {};
       
@@ -751,7 +282,6 @@ function convertPSLCSVToInternalFormat(rawRows: any[][]): any[] {
         const monthName = monthRow[colIndex];
         let bagsInMonth = parseNumericValue(row[colIndex]) || 0;
         
-        // Handle comma-separated numbers like "3,12,500"
         if (typeof row[colIndex] === 'string' && row[colIndex].includes(',')) {
           const cleanedNumber = row[colIndex].replace(/,/g, '');
           bagsInMonth = parseFloat(cleanedNumber) || 0;
@@ -760,25 +290,19 @@ function convertPSLCSVToInternalFormat(rawRows: any[][]): any[] {
         if (bagsInMonth > 0) {
           monthlyBreakdown[monthName] = bagsInMonth;
           totalBagsRequired += bagsInMonth;
-          console.log(`   📅 ${monthName}: ${bagsInMonth.toLocaleString()} bags`);
         }
       });
       
-      // If no requirement data, use monthly cartons fallback
       if (totalBagsRequired === 0 && monthlyCartons > 0) {
         totalBagsRequired = monthlyCartons * bagsPerCarton;
-        console.log(`   🔄 Using fallback: ${monthlyCartons} cartons × ${bagsPerCarton} bags = ${totalBagsRequired} total bags`);
       }
       
       if (totalBagsRequired <= 0) {
-        console.log(`⏭️ Row ${rowIndex + 3}: No requirements found`);
-        skippedCount++;
         return;
       }
       
-      // Get bag specifications
       const bagSpecs = getBagSpecsFromSAPCode(sapCode.toString());
-      const finalBagName = productName.toString().trim(); // Don't include bagType
+      const finalBagName = productName.toString().trim();
       
       allOrders.push({
         bagName: finalBagName,
@@ -794,7 +318,6 @@ function convertPSLCSVToInternalFormat(rawRows: any[][]): any[] {
         paperGrade: bagSpecs.paperGrade,
         certification: bagSpecs.cert,
         
-        // PSL metadata
         rollWidth: rollWidth,
         originalSAPCode: sapCode,
         monthlyBreakdown: monthlyBreakdown,
@@ -806,19 +329,11 @@ function convertPSLCSVToInternalFormat(rawRows: any[][]): any[] {
         sourceFormat: 'PSL_CSV_CORRECTED'
       });
       
-      processedCount++;
-      console.log(`📦 Generated order ${processedCount}: ${finalBagName} - ${totalBagsRequired.toLocaleString()} bags`);
-      
     } catch (error) {
-      console.error(`❌ Error processing CSV row ${rowIndex + 3}:`, error);
-      skippedCount++;
+      console.error(`Error processing CSV row ${rowIndex + 3}:`, error);
     }
   });
   
-  console.log(`✅ PSL CSV conversion: ${dataRows.length} rows → ${processedCount} orders (${skippedCount} skipped)`);
-  if (allOrders.length > 0) {
-    console.log(`📊 Total bags: ${allOrders.reduce((sum, order) => sum + order.totalBagsRequired, 0).toLocaleString()}`);
-  }
   return allOrders;
 }
 
@@ -847,7 +362,6 @@ function consolidateOrdersByClient(orders: any[]): any[] {
     
     const firstOrder = groupOrders[0];
     let totalBags = 0;
-    let totalCartons = 0;
     const combinedMonthlyBreakdown: any = {};
     
     groupOrders.forEach((order) => {
@@ -858,7 +372,6 @@ function consolidateOrdersByClient(orders: any[]): any[] {
       } else if (order.orderUnit === 'cartons') {
         const bagsPerCarton = order.bagsPerCarton || 1000;
         totalBags += order.orderQty * bagsPerCarton;
-        totalCartons += order.orderQty;
       }
       
       if (order.monthlyBreakdown) {
@@ -882,6 +395,58 @@ function consolidateOrdersByClient(orders: any[]): any[] {
   });
   
   return consolidatedOrders;
+}
+
+async function parseCSV(buffer: Buffer): Promise<any[]> {
+  return new Promise((resolve, reject) => {
+    const allRows: any[][] = [];
+    parse(buffer, {
+      columns: false,
+      skip_empty_lines: true,
+      delimiter: ',',
+    })
+    .on('readable', function(this: any) {
+      let record;
+      while (record = this.read()) {
+        allRows.push(record);
+      }
+    })
+    .on('error', reject)
+    .on('end', () => {
+      if (allRows.length >= 3 && 
+          allRows[1] && 
+          allRows[1].join('|').toLowerCase().includes('sap code') &&
+          allRows[1].join('|').toLowerCase().includes('desc')) {
+        
+        console.log('🔍 Detected PSL format in CSV - converting...');
+        const convertedData = convertPSLCSVToInternalFormat(allRows);
+        resolve(convertedData);
+      } else {
+        console.log('📊 Standard CSV format - reparsing with headers...');
+        const standardRecords: any[] = [];
+        parse(buffer, {
+          columns: true,
+          skip_empty_lines: true,
+          delimiter: ',',
+        })
+        .on('readable', function(this: any) {
+          let record;
+          while (record = this.read()) {
+            standardRecords.push(record);
+          }
+        })
+        .on('error', reject)
+        .on('end', () => resolve(standardRecords));
+      }
+    });
+  });
+}
+
+async function parseExcel(buffer: Buffer): Promise<any[]> {
+  const workbook = XLSX.read(buffer, { type: 'buffer' });
+  const sheetName = workbook.SheetNames[0];
+  const worksheet = workbook.Sheets[sheetName];
+  return XLSX.utils.sheet_to_json(worksheet);
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -909,7 +474,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-
     let parsedData: any[] = [];
     const fileExtension = file.originalname.split('.').pop()?.toLowerCase();
 
@@ -921,7 +485,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.error(`Unsupported file format: ${fileExtension}`);
       return res.status(400).json({ error: 'Unsupported file format' });
     }
-
 
     console.log('📊 Parsed data sample before consolidation:', parsedData.slice(0, 2));
     const consolidatedData = consolidateOrdersByClient(parsedData);
@@ -980,114 +543,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-async function parseCSV(buffer: Buffer): Promise<any[]> {
-  return new Promise((resolve, reject) => {
-    // First, parse without headers to check for PSL format
-    const allRows: any[][] = [];
-    parse(buffer, {
-      columns: false, // Parse as raw arrays first
-      skip_empty_lines: true,
-      delimiter: ',',
-    })
-    .on('readable', function(this: any) {
-      let record;
-      while (record = this.read()) {
-        allRows.push(record);
-      }
-    })
-    .on('error', reject)
-    .on('end', () => {
-      console.log('📊 CSV parsed as raw rows, checking for PSL format...');
-      console.log(`📊 Total rows: ${allRows.length}`);
-      console.log('📊 Row 1 sample:', allRows[0]?.slice(0, 10));
-      console.log('📊 Row 2 sample:', allRows[1]?.slice(0, 10)); 
-      console.log('📊 Row 3 sample:', allRows[2]?.slice(0, 10));
-      
-      // Check if this is PSL format (row 2 should have "Sap Code ", "Desc", etc.)
-      if (allRows.length >= 3 && 
-          allRows[1] && 
-          allRows[1].join('|').toLowerCase().includes('sap code') &&
-          allRows[1].join('|').toLowerCase().includes('desc')) {
-        
-        console.log('🔍 Detected PSL format in CSV - converting with proper headers...');
-        const convertedData = convertPSLCSVToInternalFormat(allRows);
-        resolve(convertedData);
-      } else {
-        console.log('📊 Standard CSV format - reparsing with headers...');
-        // Reparse with headers for standard CSV
-        const standardRecords: any[] = [];
-        parse(buffer, {
-          columns: true,
-          skip_empty_lines: true,
-          delimiter: ',',
-        })
-        .on('readable', function(this: any) {
-          let record;
-          while (record = this.read()) {
-            standardRecords.push(record);
-          }
-        })
-        .on('error', reject)
-        .on('end', () => resolve(standardRecords));
-      }
-    });
-  });
-}
-
-async function parseExcel(buffer: Buffer): Promise<any[]> {
-  const workbook = XLSX.read(buffer, { type: 'buffer' });
-  const sheetName = workbook.SheetNames[0];
-  const worksheet = workbook.Sheets[sheetName];
-  
-  // Try multiple parsing approaches for robustness
-  let rawData: any[] = [];
-  
-  try {
-    // First attempt: Parse as JSON with header detection
-    rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-    console.log('📊 Raw sheet data (first 3 rows):', rawData.slice(0, 3));
-    
-    // Convert to cleaner format by finding header row and mapping columns
-    const cleanedData = cleanExcelData(rawData);
-    
-    if (cleanedData.length > 0) {
-      console.log('✅ Successfully cleaned Excel data');
-      console.log('📊 Cleaned data sample:', cleanedData.slice(0, 2));
-      return cleanedData;
-    }
-    
-    // Fallback: Try original JSON parsing
-    console.log('⚠️ Cleaning failed, trying original JSON parsing...');
-    const fallbackData = XLSX.utils.sheet_to_json(worksheet);
-    
-    // Check if this is PSL format by looking for key PSL columns
-    if (isPSLFormat(fallbackData)) {
-      console.log('🔍 Detected PSL Production Requirement format - converting to internal format');
-      const convertedData = convertPSLToInternalFormat(fallbackData);
-      console.log('🔍 Converted data sample:', convertedData.slice(0, 2));
-      return convertedData;
-    }
-    
-    return fallbackData;
-    
-  } catch (error) {
-    console.error('Excel parsing error:', error);
-    throw new Error(`Failed to parse Excel file: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-}
-
-// Helper function to clean string values
-function cleanStringValue(value: any): string | null {
-  if (value === null || value === undefined) return null;
-  
-  const str = value.toString().trim();
-  if (str === '' || str === '#VALUE!' || str === '#DIV/0!' || str === '#N/A' || str === 'undefined' || str === 'null') {
-    return null;
-  }
-  
-  return str;
-}
-
 function validateOrderData(data: any[]): any[] {
   const orderSchema = z.object({
     bagName: z.string().min(1),
@@ -1107,55 +562,26 @@ function validateOrderData(data: any[]): any[] {
 
   return data.map((row, index) => {
     try {
-      // Enhanced data cleaning and conversion
       const processedRow = {
         ...row,
-        // Clean and convert bagName
-        bagName: cleanStringValue(row.bagName) || `Order ${index + 1}`,
-        
-        // Clean and convert quantities - support multiple field names, prioritize actual PSL data
-        orderQty: parseNumericValue(row.orderQty || row.totalBagsRequired || row.cartonsRequired || row.quantity || row.qty) || 1000,
-        
-        // Clean numeric fields with fallbacks
-        width: row.width ? parseNumericValue(row.width) : undefined,
-        gusset: row.gusset ? parseNumericValue(row.gusset) : undefined,
-        height: row.height ? parseNumericValue(row.height) : undefined,
-        gsm: row.gsm ? parseNumericValue(row.gsm) : undefined,
-        deliveryDays: parseNumericValue(row.deliveryDays) || 14,
-        colors: parseInt(cleanStringValue(row.colors) || '0') || 0,
-        
-        // Clean string fields
-        handleType: cleanStringValue(row.handleType) || 'FLAT HANDLE',
-        paperGrade: cleanStringValue(row.paperGrade) || 'VIRGIN',
-        certification: cleanStringValue(row.certification) || 'FSC',
-        orderUnit: cleanStringValue(row.orderUnit) || 'cartons',
-        sku: cleanStringValue(row.sku || row.originalSAPCode) || undefined
+        orderQty: parseFloat(row.orderQty || row.quantity || row.qty) || 1000,
+        width: row.width ? parseFloat(row.width) : undefined,
+        gusset: row.gusset ? parseFloat(row.gusset) : undefined,
+        height: row.height ? parseFloat(row.height) : undefined,
+        gsm: row.gsm ? parseFloat(row.gsm) : undefined,
+        deliveryDays: row.deliveryDays ? parseFloat(row.deliveryDays) : 14,
+        colors: row.colors ? parseInt(row.colors) : 0,
       };
-
-      // Additional validation for required fields
-      if (!processedRow.bagName || processedRow.bagName.trim() === '') {
-        throw new Error('bagName is required and cannot be empty');
-      }
-      
-      if (!processedRow.orderQty || processedRow.orderQty <= 0) {
-        throw new Error('orderQty must be a positive number');
-      }
 
       return orderSchema.parse(processedRow);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown validation error';
-      console.error(`❌ Validation failed for row ${index + 1}:`, {
-        original: row,
-        error: errorMessage
-      });
       throw new Error(`Validation error in row ${index + 1}: ${errorMessage}`);
     }
   });
 }
 
-// All the helper functions from routes.ts
-
-// Helper function to fetch all inventory from Quickbase once
+// Rest of your existing functions (fetchAllInventory, machine functions, etc.)
 async function fetchAllInventory(): Promise<Map<string, number>> {
   const inventoryMap = new Map<string, number>();
   
@@ -1181,7 +607,7 @@ async function fetchAllInventory(): Promise<Map<string, number>> {
       },
       body: JSON.stringify({
         from: QB_TABLE_ID,
-        select: [6, 13], // SAP Code field (6) and Stock field (13)
+        select: [6, 13],
         options: {
           compareWithAppLocalTime: false
         }
@@ -1198,7 +624,6 @@ async function fetchAllInventory(): Promise<Map<string, number>> {
 
     const data = await response.json();
     
-    // Build inventory map from Quickbase data
     for (const record of data.data) {
       const sapCode = record['6']?.value;
       const stock = record['13']?.value || 0;
@@ -1217,7 +642,6 @@ async function fetchAllInventory(): Promise<Map<string, number>> {
   }
 }
 
-// Machine configuration and availability tracking
 interface MachineSpec {
   id: string;
   name: string;
@@ -1227,7 +651,7 @@ interface MachineSpec {
   minGsm: number;
   maxGsm: number;
   supportedHandles: string[];
-  capacity: number; // bags per hour
+  capacity: number;
   available: boolean;
   nextAvailableTime: Date;
 }
@@ -1253,7 +677,7 @@ function initializeMachineFleet(): MachineSpec[] {
       minGsm: 50,
       maxGsm: 120,
       supportedHandles: ['FLAT HANDLE', 'TWISTED HANDLE'],
-      capacity: 15000, // bags per hour
+      capacity: 15000,
       available: true,
       nextAvailableTime: baseTime
     },
@@ -1266,7 +690,7 @@ function initializeMachineFleet(): MachineSpec[] {
       minGsm: 40,
       maxGsm: 100,
       supportedHandles: ['FLAT HANDLE'],
-      capacity: 12000, // bags per hour
+      capacity: 12000,
       available: true,
       nextAvailableTime: baseTime
     },
@@ -1279,14 +703,13 @@ function initializeMachineFleet(): MachineSpec[] {
       minGsm: 70,
       maxGsm: 120,
       supportedHandles: ['TWISTED HANDLE'],
-      capacity: 8000, // bags per hour
+      capacity: 8000,
       available: true,
       nextAvailableTime: baseTime
     }
   ];
 }
 
-// Helper function to check inventory with running total
 function checkInventoryWithRunningTotal(bom: any[], runningInventory: Map<string, number>): {feasible: boolean, insufficientMaterials: string[], consumedMaterials: any[]} {
   const insufficientMaterials: string[] = [];
   const consumedMaterials: any[] = [];
@@ -1302,7 +725,6 @@ function checkInventoryWithRunningTotal(bom: any[], runningInventory: Map<string
         `${material.description || material.sapCode} (need ${required}, have ${available})`
       );
     } else {
-      // Material is sufficient, track what would be consumed
       consumedMaterials.push({
         sapCode: material.sapCode,
         description: material.description,
@@ -1394,17 +816,14 @@ function findAvailableMachine(specs: any, machines: MachineSpec[], deliveryDays:
   const productionHours = Math.ceil(bagQuantity / selectedMachine.capacity);
   const scheduledEndTime = new Date(selectedMachine.nextAvailableTime.getTime() + productionHours * 60 * 60 * 1000);
   
-  
   return { machine: selectedMachine, scheduledEndTime };
 }
 
-// Helper function to schedule production on machine
 function scheduleProductionOnMachine(machine: MachineSpec, bagQuantity: number, orderId: string): MachineSchedule {
   const productionHours = Math.ceil(bagQuantity / machine.capacity);
   const startTime = new Date(machine.nextAvailableTime);
-  const endTime = new Date(startTime.getTime() + productionHours * 60 * 60 * 1000); // Add hours in milliseconds
+  const endTime = new Date(startTime.getTime() + productionHours * 60 * 60 * 1000);
   
-  // Update machine availability
   machine.nextAvailableTime = endTime;
   
   return {
@@ -1417,8 +836,6 @@ function scheduleProductionOnMachine(machine: MachineSpec, bagQuantity: number, 
 }
 
 async function processOrdersWithSequentialInventory(orders: any[]): Promise<{results: any[], summary: any}> {
-  
-  // Initialize systems
   const runningInventory = await fetchAllInventory();
   const machineFleet = initializeMachineFleet();
   const productionSchedule: MachineSchedule[] = [];
@@ -1427,27 +844,19 @@ async function processOrdersWithSequentialInventory(orders: any[]): Promise<{res
   let totalProcessedCost = 0;
   let feasibleOrdersCount = 0;
   
-  // Process orders sequentially
   for (let i = 0; i < orders.length; i++) {
     const order = orders[i];
     const orderIndex = i + 1;
     
-    
     try {
-      // Calculate BOM for this order
       const orderAnalysis = await calculateOrderAnalysisWithoutInventoryCheck(order);
-      
-      // Check inventory against running totals
       const inventoryCheck = checkInventoryWithRunningTotal(orderAnalysis.bom, runningInventory);
-      
-      // Only check machine availability if inventory is feasible
       const machineCheck = inventoryCheck.feasible 
         ? findAvailableMachine(orderAnalysis.specs, machineFleet, order.deliveryDays || 14, orderAnalysis.actualBags)
         : { machine: null, scheduledEndTime: null };
       
       const isFeasible = inventoryCheck.feasible && machineCheck.machine !== null;
       
-      // Build result object
       const orderResult = {
         ...order,
         ...orderAnalysis,
@@ -1462,18 +871,12 @@ async function processOrdersWithSequentialInventory(orders: any[]): Promise<{res
         consumedMaterials: inventoryCheck.consumedMaterials
       };
       
-      // If feasible, actually consume inventory and schedule machine
       if (isFeasible) {
-        console.log(`✅ Order ${orderIndex} is FEASIBLE - Consuming materials and scheduling production`);
-        
-        // Consume inventory
         for (const consumption of inventoryCheck.consumedMaterials) {
           const currentStock = runningInventory.get(consumption.sapCode) || 0;
           runningInventory.set(consumption.sapCode, currentStock - consumption.consumed);
-          console.log(`   📉 ${consumption.description}: ${currentStock} → ${currentStock - consumption.consumed}`);
         }
         
-        // Schedule machine production
         if (machineCheck.machine) {
           const schedule = scheduleProductionOnMachine(
             machineCheck.machine, 
@@ -1482,21 +885,10 @@ async function processOrdersWithSequentialInventory(orders: any[]): Promise<{res
           );
           orderResult.productionSchedule = schedule;
           productionSchedule.push(schedule);
-          
-          console.log(`   🏭 Scheduled on ${machineCheck.machine.name}: ${schedule.startTime.toLocaleDateString()} - ${schedule.endTime.toLocaleDateString()}`);
         }
         
         totalProcessedCost += orderAnalysis.totalCost;
         feasibleOrdersCount++;
-        
-      } else {
-        console.log(`❌ Order ${orderIndex} is NOT FEASIBLE`);
-        if (!inventoryCheck.feasible) {
-          console.log(`   📉 Inventory issues: ${inventoryCheck.insufficientMaterials.join(', ')}`);
-        }
-        if (!machineCheck.machine) {
-          console.log(`   🏭 No compatible machine available`);
-        }
       }
       
       results.push(orderResult);
@@ -1513,7 +905,6 @@ async function processOrdersWithSequentialInventory(orders: any[]): Promise<{res
     }
   }
   
-  // Create summary with remaining inventory
   const remainingInventory = Array.from(runningInventory.entries()).map(([sapCode, remaining]) => ({
     sapCode,
     remaining
@@ -1533,11 +924,9 @@ async function processOrdersWithSequentialInventory(orders: any[]): Promise<{res
     }))
   };
   
-  
   return { results, summary };
 }
 
-// Enhanced version without external inventory/machine checks (used by sequential processor)
 async function calculateOrderAnalysisWithoutInventoryCheck(order: any) {
   const calculateActualBags = (qty: number, unit: 'bags' | 'cartons'): number => {
     return unit === 'cartons' ? qty * 250 : qty;
@@ -1545,7 +934,6 @@ async function calculateOrderAnalysisWithoutInventoryCheck(order: any) {
 
   const actualBags = calculateActualBags(order.orderQty, order.orderUnit || 'cartons');
   
-  // Enhanced BOM calculation based on combined calculator logic
   const specs = {
     width: order.width || 320,
     gusset: order.gusset || 160, 
@@ -1557,7 +945,6 @@ async function calculateOrderAnalysisWithoutInventoryCheck(order: any) {
     bagName: order.bagName || 'Custom Bag'
   };
   
-  // Material database from combined calculator
   const MATERIAL_DATABASE = {
     PAPER: {
       VIRGIN: {
@@ -1593,23 +980,16 @@ async function calculateOrderAnalysisWithoutInventoryCheck(order: any) {
     }
   };
 
-  // Enhanced material pricing
   const materialPrices: Record<string, number> = {
-    // Paper materials
     "1003696": 1.2, "1003697": 1.25, "1003771": 1.15, "1003988": 1.1,
     "1004016": 1.0, "1004017": 1.3, "1004061": 1.35, "1004286": 1.2,
     "1004359": 1.15,
-    // Adhesives
     "1004557": 8.5, "1004555": 9.2,
-    // Handles
     "1003688": 3.5, "1003930": 3.2, "1003967": 12.5,
-    // Patches
     "1003695": 4.8, "1003823": 4.5, "1003948": 5.2,
-    // Cartons
     "1003530": 0.15, "1004232": 0.12, "1004289": 0.18, "1004308": 0.22
   };
 
-  // Calculate detailed paper requirements
   const frontBack = 2 * (specs.width * specs.height);
   const gussetArea = 2 * (specs.gusset * specs.height);
   const bottomArea = specs.width * specs.gusset;
@@ -1618,15 +998,12 @@ async function calculateOrderAnalysisWithoutInventoryCheck(order: any) {
   const paperWeightPerMm2 = specs.gsm / 1000000;
   const paperWeightPerBag = Math.round(((totalAreaMm2 * paperWeightPerMm2) / 1000) * 1000000) / 1000000;
   
-  // Get paper info from material database
   const paperGradeData = MATERIAL_DATABASE.PAPER[specs.paperGrade as keyof typeof MATERIAL_DATABASE.PAPER];
   const gsmStr = specs.gsm.toString();
   const paperInfo = (paperGradeData as any)?.[gsmStr] || (paperGradeData as any)?.["90"];
   
-  // Build enhanced BOM
   const bom = [];
   
-  // Paper
   if (paperInfo) {
     const totalPaperQuantity = Math.round((paperWeightPerBag * actualBags) * 1000) / 1000;
     bom.push({
@@ -1641,7 +1018,6 @@ async function calculateOrderAnalysisWithoutInventoryCheck(order: any) {
     });
   }
 
-  // Cold glue
   const coldGlueQty = 0.0018;
   const totalColdGlueQuantity = Math.round((coldGlueQty * actualBags) * 1000) / 1000;
   bom.push({
@@ -1655,7 +1031,6 @@ async function calculateOrderAnalysisWithoutInventoryCheck(order: any) {
     totalCost: Math.round((totalColdGlueQuantity * (materialPrices[MATERIAL_DATABASE.GLUE.COLD.sapCode] || 8.5)) * 100) / 100
   });
 
-  // Handle materials
   if (specs.handleType === 'FLAT HANDLE') {
     const handleWeight = 0.0052;
     const patchWeight = 0.0012;
@@ -1741,7 +1116,6 @@ async function calculateOrderAnalysisWithoutInventoryCheck(order: any) {
     });
   }
 
-  // Carton
   const cartonQty = 0.004;
   const totalCartonQuantity = Math.round((cartonQty * actualBags) * 1000) / 1000;
   bom.push({
