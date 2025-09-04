@@ -170,6 +170,7 @@ function parseNumericValue(value: any): number | null {
   if (typeof value === 'number') return value;
   
   if (typeof value === 'string') {
+    // Handle comma-separated numbers like "7,92,000" or "3,12,500"
     const cleaned = value.replace(/,/g, '').replace(/\s+/g, '').trim();
     
     if (cleaned === '' || cleaned.toLowerCase().includes('mto')) return null;
@@ -179,6 +180,17 @@ function parseNumericValue(value: any): number | null {
   }
   
   return null;
+}
+
+function cleanStringValue(value: any): string | null {
+  if (value === null || value === undefined) return null;
+  
+  const str = value.toString().trim();
+  if (str === '' || str === '#VALUE!' || str === '#DIV/0!' || str === '#N/A' || str === 'undefined' || str === 'null') {
+    return null;
+  }
+  
+  return str;
 }
 
 function getBagSpecsFromSAPCode(sapCode: string): any {
@@ -446,7 +458,34 @@ async function parseExcel(buffer: Buffer): Promise<any[]> {
   const workbook = XLSX.read(buffer, { type: 'buffer' });
   const sheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[sheetName];
-  return XLSX.utils.sheet_to_json(worksheet);
+  
+  let rawData: any[] = [];
+  
+  try {
+    rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    console.log('📊 Raw sheet data (first 3 rows):', rawData.slice(0, 3));
+    
+    const cleanedData = cleanExcelData(rawData);
+    
+    if (cleanedData.length > 0) {
+      console.log('✅ Successfully cleaned Excel data');
+      return cleanedData;
+    }
+    
+    console.log('⚠️ Cleaning failed, trying original JSON parsing...');
+    const fallbackData = XLSX.utils.sheet_to_json(worksheet);
+    
+    if (isPSLFormat(fallbackData)) {
+      console.log('🔍 Detected PSL Production Requirement format - converting to internal format');
+      return convertPSLToInternalFormat(fallbackData);
+    }
+    
+    return fallbackData;
+    
+  } catch (error) {
+    console.error('Excel parsing error:', error);
+    throw new Error(`Failed to parse Excel file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -543,6 +582,418 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 }
 
+// Robust Excel data cleaning function
+function cleanExcelData(rawRows: any[][]): any[] {
+  if (!rawRows || rawRows.length < 2) return [];
+  
+  console.log('🧹 Starting Excel data cleaning...');
+  console.log(`📊 Input: ${rawRows.length} raw rows`);
+  
+  // Find header row by looking for key PSL indicators
+  // PSL format: Row 1 = month names, Row 2 = actual headers, Row 3+ = data
+  let headerRowIndex = -1;
+  let dataStartIndex = -1;
+  
+  for (let i = 0; i < Math.min(5, rawRows.length); i++) {
+    const row = rawRows[i];
+    if (Array.isArray(row)) {
+      // Look for PSL header patterns in row content
+      const rowText = row.join('|').toLowerCase();
+      if (rowText.includes('sap code') && rowText.includes('desc') && rowText.includes('paper')) {
+        headerRowIndex = i;
+        dataStartIndex = i + 1;
+        console.log(`🎯 Found PSL header at row ${i + 1} (Excel row ${i + 1})`);
+        
+        // Log the month row if it exists (should be row before header)
+        if (i > 0) {
+          console.log(`📅 Month row at row ${i}: ${rawRows[i - 1].join(', ')}`);
+        }
+        break;
+      }
+    }
+  }
+  
+  if (headerRowIndex === -1) {
+    console.log('⚠️ No PSL header found, using smart column detection...');
+    return smartColumnMapping(rawRows);
+  }
+  
+  const headerRow = rawRows[headerRowIndex];
+  const dataRows = rawRows.slice(dataStartIndex);
+  
+  console.log('📋 Header row:', headerRow);
+  console.log(`📊 Processing ${dataRows.length} data rows`);
+  
+  // Map column indices for PSL format
+  const columnMap = {
+    bagType: -1,        // Column A: bag type (NL2, G4, etc.)
+    sapCode: -1,        // Column B: SAP Code
+    description: -1,    // Column C: Description
+    paper: -1,          // Column D: Paper width
+    monthlyReq: -1,     // Column E: Monthly Requirement
+    weeklyUsage: -1,    // Column F: Weekly Usage
+    bagsPerCarton: -1   // Column G: No of Bags
+  };
+  
+  // Find column positions
+  headerRow.forEach((header: any, index: number) => {
+    const headerStr = (header || '').toString().toLowerCase().trim();
+    
+    if (headerStr.includes('sap code')) columnMap.sapCode = index;
+    else if (headerStr.includes('desc')) columnMap.description = index;
+    else if (headerStr.includes('paper')) columnMap.paper = index;
+    else if (headerStr.includes('monthly requirement')) columnMap.monthlyReq = index;
+    else if (headerStr.includes('weekly usage')) columnMap.weeklyUsage = index;
+    else if (headerStr.includes('no of bags')) columnMap.bagsPerCarton = index;
+  });
+  
+  // Bag type is typically in column A (index 0)
+  columnMap.bagType = 0;
+  
+  console.log('🗺️ Column mapping:', columnMap);
+  
+  const cleanedOrders: any[] = [];
+  
+  dataRows.forEach((row: any[], rowIndex: number) => {
+    try {
+      if (!Array.isArray(row) || row.length === 0) return;
+      
+      // Extract data using column mapping
+      const bagType = cleanValue(row[columnMap.bagType]);
+      const sapCode = cleanValue(row[columnMap.sapCode]);
+      const description = cleanValue(row[columnMap.description]);
+      const paper = parseNumericValue(row[columnMap.paper]);
+      const monthlyReq = parseNumericValue(row[columnMap.monthlyReq]);
+      const bagsPerCarton = parseNumericValue(row[columnMap.bagsPerCarton]) || (monthlyReq > 0 ? Math.floor(monthlyReq) : 1000);
+      
+      // Skip rows with insufficient data
+      if (!sapCode || !description || !monthlyReq || monthlyReq <= 0) {
+        console.log(`⏭️ Skipping row ${rowIndex + dataStartIndex + 1}: insufficient data`);
+        return;
+      }
+      
+      // Skip MTO (Made To Order) items
+      if (description.toString().toLowerCase().includes('mto') || monthlyReq.toString().toLowerCase().includes('mto')) {
+        console.log(`⏭️ Skipping MTO item: ${description}`);
+        return;
+      }
+      
+      // Get bag specifications from SAP code
+      const bagSpecs = getBagSpecsFromSAPCode(sapCode.toString());
+      const finalBagName = description.toString().trim(); // Don't include bagType in name
+      const totalBags = monthlyReq * bagsPerCarton;
+      
+      console.log(`✅ Processing: ${finalBagName} - SAP: ${sapCode} - ${monthlyReq} cartons (${totalBags} bags)`);
+      
+      cleanedOrders.push({
+        bagName: finalBagName,
+        sku: sapCode.toString(),
+        orderQty: monthlyReq,
+        orderUnit: 'cartons',
+        
+        // Use specifications from SAP code lookup
+        width: bagSpecs.width,
+        gusset: bagSpecs.gusset,
+        height: bagSpecs.height,
+        gsm: bagSpecs.gsm,
+        handleType: bagSpecs.handleType,
+        paperGrade: bagSpecs.paperGrade,
+        certification: bagSpecs.cert,
+        
+        // PSL-specific metadata
+        originalSAPCode: sapCode,
+        cartonsRequired: monthlyReq,
+        bagsPerCarton: bagsPerCarton,
+        totalBags: totalBags,
+        rollWidth: paper || null,
+        
+        // Source tracking
+        sourceRow: rowIndex + dataStartIndex + 1,
+        sourceFormat: 'PSL_CLEANED'
+      });
+      
+    } catch (error) {
+      console.error(`❌ Error processing row ${rowIndex + dataStartIndex + 1}:`, error);
+    }
+  });
+  
+  console.log(`✅ Cleaned Excel data: ${rawRows.length} rows → ${cleanedOrders.length} valid orders`);
+  return cleanedOrders;
+}
+
+// Smart column mapping for non-standard Excel files
+function smartColumnMapping(rawRows: any[][]): any[] {
+  console.log('🤖 Using smart column detection for non-standard Excel format...');
+  
+  if (rawRows.length < 2) return [];
+  
+  // Look for numeric SAP codes and descriptions in the first few rows
+  const cleanedOrders: any[] = [];
+  
+  rawRows.forEach((row: any[], rowIndex: number) => {
+    try {
+      if (!Array.isArray(row) || row.length < 3) return;
+      
+      // Try to find SAP code (should be numeric, 5-6 digits)
+      let sapCode = null;
+      let description = null;
+      let quantity = null;
+      
+      for (let colIndex = 0; colIndex < Math.min(10, row.length); colIndex++) {
+        const value = cleanValue(row[colIndex]);
+        
+        // Look for SAP code pattern (5-6 digit numbers)
+        if (typeof value === 'number' && value >= 10000 && value <= 999999) {
+          sapCode = value;
+        }
+        
+        // Look for descriptions (non-empty strings that aren't numbers)
+        if (typeof value === 'string' && value.length > 2 && !value.match(/^\d+$/)) {
+          description = value;
+        }
+        
+        // Look for quantities (numbers > 10)
+        if (typeof value === 'number' && value > 10 && value < 1000000) {
+          quantity = value;
+        }
+      }
+      
+      // If we found essential data, create an order
+      if (sapCode && description && quantity) {
+        const bagSpecs = getBagSpecsFromSAPCode(sapCode.toString());
+        const finalBagName = description;
+        
+        console.log(`🔍 Smart detected: ${finalBagName} - SAP: ${sapCode} - Qty: ${quantity}`);
+        
+        cleanedOrders.push({
+          bagName: finalBagName,
+          sku: sapCode.toString(),
+          orderQty: quantity,
+          orderUnit: 'cartons',
+          
+          // Use specifications from SAP code lookup
+          width: bagSpecs.width,
+          gusset: bagSpecs.gusset,
+          height: bagSpecs.height,
+          gsm: bagSpecs.gsm,
+          handleType: bagSpecs.handleType,
+          paperGrade: bagSpecs.paperGrade,
+          certification: bagSpecs.cert,
+          
+          // Metadata
+          originalSAPCode: sapCode,
+          cartonsRequired: quantity,
+          bagsPerCarton: 250, // default
+          totalBags: quantity * 250,
+          
+          // Source tracking
+          sourceRow: rowIndex + 1,
+          sourceFormat: 'SMART_DETECTED'
+        });
+      }
+      
+    } catch (error) {
+      console.error(`❌ Error in smart detection for row ${rowIndex + 1}:`, error);
+    }
+  });
+  
+  console.log(`🤖 Smart detection: ${rawRows.length} rows → ${cleanedOrders.length} detected orders`);
+  return cleanedOrders;
+}
+
+// PSL Format Detection and Conversion Functions
+function isPSLFormat(data: any[]): boolean {
+  if (!data || data.length < 2) return false; // Need at least 2 rows
+  
+  const firstRow = data[0];
+  console.log('🔍 PSL Format detection - First row keys:', Object.keys(firstRow || {}));
+  console.log('🔍 PSL Format detection - First row sample:', {
+    key0: Object.keys(firstRow || {})[0],
+    key1: Object.keys(firstRow || {})[1], 
+    key2: Object.keys(firstRow || {})[2],
+    key3: Object.keys(firstRow || {})[3],
+    key4: Object.keys(firstRow || {})[4]
+  });
+  
+  // For CSV files, the headers become the object keys directly
+  // For Excel files, headers are in __EMPTY_X format
+  const allKeys = Object.keys(firstRow || {}).join('|').toLowerCase();
+  
+  // Check for PSL header patterns
+  const hasSAPCode = allKeys.includes('sap code');
+  const hasDesc = allKeys.includes('desc');
+  const hasPaper = allKeys.includes('paper');
+  const hasMonthlyReq = allKeys.includes('monthly requirement');
+  const hasMonthData = allKeys.includes('requirement') && 
+                      (allKeys.includes('aug') || allKeys.includes('sept') || allKeys.includes('oct'));
+  
+  const isPSL = hasSAPCode && hasDesc && hasPaper && hasMonthlyReq && hasMonthData;
+  
+  console.log('🔍 PSL Format check:', {
+    hasSAPCode,
+    hasDesc,
+    hasPaper,
+    hasMonthlyReq,
+    hasMonthData,
+    isPSL,
+    allKeys: allKeys.substring(0, 200) + '...'
+  });
+  
+  return isPSL;
+}
+
+function convertPSLToInternalFormat(pslData: any[]): any[] {
+  if (!pslData || pslData.length < 1) return [];
+  
+  const firstRow = pslData[0];
+  console.log(`📊 PSL Conversion: Processing ${pslData.length} data rows`);
+  
+  // Find all requirement columns with enhanced detection
+  const requirementColumns: string[] = [];
+  Object.keys(firstRow).forEach(key => {
+    const keyLower = key.toLowerCase().trim();
+    
+    // Enhanced matching for various PSL requirement column formats
+    const isRequirementColumn = keyLower.includes('requirement') || // Aug Requirement, Oct Requirement etc.
+                               keyLower.includes('req') || // Short form: Aug Req, Oct Req
+                               /^[a-z]{3}$/.test(keyLower) || // Oct, Nov etc.
+                               /^[a-z]{3}\s+requirement$/i.test(keyLower) || // "Oct Requirement"
+                               /^[a-z]{3}\s+req$/i.test(keyLower) || // "Oct Req"
+                               /^\d{4}-\d{2}$/.test(keyLower) || // 2024-10, 2024-11 format
+                               /^[a-z]{3,9}\s*\d{4}$/i.test(keyLower); // October 2024, Nov 2024
+    
+    if (isRequirementColumn && 
+        !keyLower.includes('sap') && 
+        !keyLower.includes('desc') && 
+        !keyLower.includes('paper') && 
+        !keyLower.includes('weekly') && 
+        !keyLower.includes('bags') && 
+        !keyLower.includes('monthly requirement') && // Exclude the generic "monthly requirement" field
+        keyLower !== '') {
+      requirementColumns.push(key);
+      console.log(`📅 Found requirement column: "${key}" (normalized: "${keyLower}")`);
+    }
+  });
+  
+  console.log(`📊 Found ${requirementColumns.length} requirement columns`);
+  
+  let allOrders: any[] = [];
+  
+  // Process each PSL data row
+  pslData.forEach((pslRow, rowIndex) => {
+    try {
+      // For CSV files, the column headers become keys directly
+      // Extract basic PSL data using the actual column names from CSV
+      const firstKey = Object.keys(pslRow)[0]; // This should be the bag type column
+      const sapCodeKey = Object.keys(pslRow).find(key => key.toLowerCase().includes('sap code'));
+      const descKey = Object.keys(pslRow).find(key => key.toLowerCase().includes('desc'));
+      const paperKey = Object.keys(pslRow).find(key => key.toLowerCase().includes('paper'));
+      const monthlyReqKey = Object.keys(pslRow).find(key => key.toLowerCase().includes('monthly requirement'));
+      const weeklyUsageKey = Object.keys(pslRow).find(key => key.toLowerCase().includes('weekly usage'));
+      const bagsKey = Object.keys(pslRow).find(key => key.toLowerCase().includes('no of bags'));
+      
+      const bagType = cleanValue(pslRow[firstKey]);
+      const sapCode = cleanValue(pslRow[sapCodeKey || '']);
+      const productName = cleanValue(pslRow[descKey || '']);
+      const rollWidth = parseNumericValue(pslRow[paperKey || '']);
+      const monthlyCartons = parseNumericValue(pslRow[monthlyReqKey || '']);
+      const weeklyUsage = parseNumericValue(pslRow[weeklyUsageKey || '']);
+      const bagsPerCarton = parseNumericValue(pslRow[bagsKey || '']) || 1000; // Avoid hardcoded 250
+      
+      console.log(`🔍 Row ${rowIndex + 1}: BagType="${bagType}", SAP="${sapCode}", Product="${productName}"`);
+      
+      // Enhanced validation for data integrity
+      if (!sapCode || !productName) {
+        console.log(`⏭️ Row ${rowIndex + 1}: Skipping - missing SAP code="${sapCode}" or product name="${productName}"`);
+        return;
+      }
+      
+      // Skip MTO (Made To Order) items and invalid entries
+      if (productName.toString().toLowerCase().includes('mto') ||
+          sapCode.toString().toLowerCase().includes('mto')) {
+        console.log(`⏭️ Skipping MTO item: ${productName} (SAP: ${sapCode})`);
+        return;
+      }
+      
+      // Skip header/invalid rows
+      if (productName.toString().toLowerCase().trim() === 'desc' ||
+          sapCode.toString().toLowerCase().trim() === 'sap code') {
+        console.log(`⏭️ Skipping header row: ${productName} (SAP: ${sapCode})`);
+        return;
+      }
+      
+      // Calculate total bags across all requirement columns
+      let totalBagsRequired = 0;
+      const monthlyBreakdown: any = {};
+      
+      requirementColumns.forEach(reqColumn => {
+        const bagsInMonth = parseNumericValue(pslRow[reqColumn]) || 0;
+        if (bagsInMonth > 0) {
+          monthlyBreakdown[reqColumn] = bagsInMonth;
+          totalBagsRequired += bagsInMonth;
+          console.log(`   📅 ${reqColumn}: ${bagsInMonth.toLocaleString()} bags`);
+        }
+      });
+      
+      // If no requirement columns have data, use the monthly cartons as fallback
+      if (totalBagsRequired === 0 && monthlyCartons > 0) {
+        totalBagsRequired = monthlyCartons * bagsPerCarton;
+        console.log(`   🔄 Using fallback: ${monthlyCartons} cartons × ${bagsPerCarton} bags = ${totalBagsRequired} total bags`);
+      }
+      
+      if (totalBagsRequired <= 0) {
+        console.log(`⏭️ Row ${rowIndex + 1}: No valid requirements found`);
+        return;
+      }
+      
+      console.log(`✅ Processing PSL row: ${productName} - Total: ${totalBagsRequired.toLocaleString()} bags`);
+      
+      // Get bag specifications from SAP code
+      const bagSpecs = getBagSpecsFromSAPCode(sapCode.toString());
+      const finalBagName = productName.toString().trim(); // Don't include bagType in name
+      
+      allOrders.push({
+        bagName: finalBagName,
+        sku: sapCode.toString(),
+        orderQty: totalBagsRequired, // Total bags across all months
+        orderUnit: 'bags', // Changed to bags since we're totaling actual bag requirements
+        
+        // Use specifications from SAP code lookup
+        width: bagSpecs.width,
+        gusset: bagSpecs.gusset,
+        height: bagSpecs.height,
+        gsm: bagSpecs.gsm,
+        handleType: bagSpecs.handleType,
+        paperGrade: bagSpecs.paperGrade,
+        certification: bagSpecs.cert,
+        
+        // PSL-specific metadata for tracking
+        rollWidth: rollWidth,
+        originalSAPCode: sapCode,
+        monthlyBreakdown: monthlyBreakdown,
+        totalBagsRequired: totalBagsRequired,
+        bagsPerCarton: bagsPerCarton,
+        weeklyUsage: weeklyUsage,
+        
+        // Source tracking
+        sourceRow: rowIndex + 1,
+        sourceFormat: 'PSL_WITH_TOTALS'
+      });
+      
+      console.log(`📦 Generated order: ${finalBagName}: ${totalBagsRequired.toLocaleString()} bags total`);
+      
+    } catch (error) {
+      console.error(`❌ Error processing PSL row ${rowIndex + 1}:`, error);
+    }
+  });
+  
+  console.log(`✅ Converted PSL data: ${pslData.length} rows → ${allOrders.length} valid orders`);
+  if (allOrders.length > 0) {
+    console.log(`📊 Total bags across all orders: ${allOrders.reduce((sum, order) => sum + order.totalBagsRequired, 0).toLocaleString()}`);
+  }
+  return allOrders;
+}
+
 function validateOrderData(data: any[]): any[] {
   const orderSchema = z.object({
     bagName: z.string().min(1),
@@ -562,20 +1013,47 @@ function validateOrderData(data: any[]): any[] {
 
   return data.map((row, index) => {
     try {
+      // Enhanced data cleaning and conversion
       const processedRow = {
         ...row,
-        orderQty: parseFloat(row.orderQty || row.quantity || row.qty) || 1000,
-        width: row.width ? parseFloat(row.width) : undefined,
-        gusset: row.gusset ? parseFloat(row.gusset) : undefined,
-        height: row.height ? parseFloat(row.height) : undefined,
-        gsm: row.gsm ? parseFloat(row.gsm) : undefined,
-        deliveryDays: row.deliveryDays ? parseFloat(row.deliveryDays) : 14,
-        colors: row.colors ? parseInt(row.colors) : 0,
+        // Clean and convert bagName
+        bagName: cleanStringValue(row.bagName) || `Order ${index + 1}`,
+        
+        // Clean and convert quantities - support multiple field names, prioritize actual PSL data
+        orderQty: parseNumericValue(row.orderQty || row.totalBagsRequired || row.cartonsRequired || row.quantity || row.qty) || 1000,
+        
+        // Clean numeric fields with fallbacks
+        width: row.width ? parseNumericValue(row.width) : undefined,
+        gusset: row.gusset ? parseNumericValue(row.gusset) : undefined,
+        height: row.height ? parseNumericValue(row.height) : undefined,
+        gsm: row.gsm ? parseNumericValue(row.gsm) : undefined,
+        deliveryDays: parseNumericValue(row.deliveryDays) || 14,
+        colors: parseInt(cleanStringValue(row.colors) || '0') || 0,
+        
+        // Clean string fields
+        handleType: cleanStringValue(row.handleType) || 'FLAT HANDLE',
+        paperGrade: cleanStringValue(row.paperGrade) || 'VIRGIN',
+        certification: cleanStringValue(row.certification) || 'FSC',
+        orderUnit: cleanStringValue(row.orderUnit) || 'cartons',
+        sku: cleanStringValue(row.sku || row.originalSAPCode) || undefined
       };
+
+      // Additional validation for required fields
+      if (!processedRow.bagName || processedRow.bagName.trim() === '') {
+        throw new Error('bagName is required and cannot be empty');
+      }
+      
+      if (!processedRow.orderQty || processedRow.orderQty <= 0) {
+        throw new Error('orderQty must be a positive number');
+      }
 
       return orderSchema.parse(processedRow);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown validation error';
+      console.error(`❌ Validation failed for row ${index + 1}:`, {
+        original: row,
+        error: errorMessage
+      });
       throw new Error(`Validation error in row ${index + 1}: ${errorMessage}`);
     }
   });
