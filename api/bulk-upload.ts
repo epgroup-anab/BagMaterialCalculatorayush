@@ -552,7 +552,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           machineUtilization: summary.machineUtilization || [],
           productionSchedule: summary.productionSchedule || []
         },
-        orders: calculatedOrders.slice(0, 10)
+        orders: calculatedOrders
       };
 
       res.status(200).json(response);
@@ -569,7 +569,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           machineUtilization: summary.machineUtilization || [],
           productionSchedule: summary.productionSchedule || []
         },
-        orders: calculatedOrders.slice(0, 10)
+        orders: calculatedOrders
       };
       
       res.status(200).json(response);
@@ -688,8 +688,8 @@ function cleanExcelData(rawRows: any[][]): any[] {
       cleanedOrders.push({
         bagName: finalBagName,
         sku: sapCode.toString(),
-        orderQty: monthlyReq,
-        orderUnit: 'cartons',
+        orderQty: totalBags,
+        orderUnit: 'bags',
         
         // Use specifications from SAP code lookup
         width: bagSpecs.width,
@@ -955,8 +955,8 @@ function convertPSLToInternalFormat(pslData: any[]): any[] {
       allOrders.push({
         bagName: finalBagName,
         sku: sapCode.toString(),
-        orderQty: totalBagsRequired, // Total bags across all months
-        orderUnit: 'bags', // Changed to bags since we're totaling actual bag requirements
+        orderQty: totalBagsRequired,
+        orderUnit: 'bags',
         
         // Use specifications from SAP code lookup
         width: bagSpecs.width,
