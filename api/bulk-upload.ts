@@ -3,6 +3,7 @@ import multer from 'multer';
 import { parse } from 'csv-parse';
 import * as XLSX from 'xlsx';
 import { z } from 'zod';
+import { SKU_DATA } from '../client/src/data/skuData';
 
 import mongoose, { Document, Schema } from 'mongoose';
 
@@ -153,6 +154,284 @@ function runMiddleware(req: any, res: any, fn: any) {
   });
 }
 
+// PSL Processing Helper Functions
+function cleanValue(value: any): any {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed === '' || trimmed.toLowerCase() === 'null' || trimmed.toLowerCase() === 'undefined') return null;
+    return trimmed;
+  }
+  return value;
+}
+
+function parseNumericValue(value: any): number | null {
+  if (value === null || value === undefined) return null;
+  
+  if (typeof value === 'number') return value;
+  
+  if (typeof value === 'string') {
+    const cleaned = value.replace(/,/g, '').replace(/\s+/g, '').trim();
+    
+    if (cleaned === '' || cleaned.toLowerCase().includes('mto')) return null;
+    
+    const parsed = parseFloat(cleaned);
+    return isNaN(parsed) ? null : parsed;
+  }
+  
+  return null;
+}
+
+function cleanStringValue(value: any): string | null {
+  if (value === null || value === undefined) return null;
+  
+  const str = value.toString().trim();
+  if (str === '' || str === '#VALUE!' || str === '#DIV/0!' || str === '#N/A' || str === 'undefined' || str === 'null') {
+    return null;
+  }
+  
+  return str;
+}
+
+function getBagSpecsFromSAPCode(sapCode: string): any {
+  let skuData = SKU_DATA.find(sku => sku.sku === sapCode);
+  
+  if (!skuData) {
+    skuData = SKU_DATA.find(sku => 
+      sku.bom.some(bomItem => bomItem.sapCode === sapCode)
+    );
+  }
+  
+  if (skuData) {
+    const [width, gusset, height] = skuData.dimensions.split('×').map(d => parseInt(d.trim()) * 10);
+    
+    return {
+      name: skuData.name,
+      width: width,
+      gusset: gusset,
+      height: height,
+      gsm: parseInt(skuData.gsm),
+      handleType: skuData.handle_type,
+      paperGrade: skuData.paper_grade,
+      cert: skuData.cert,
+      existingBOM: skuData.bom,
+      boxQty: parseInt(skuData.box_qty)
+    };
+  }
+  
+  console.warn(`SAP Code ${sapCode} not found in SKU database, using defaults`);
+  return {
+    name: `Product ${sapCode}`,
+    width: 320,
+    gusset: 160,
+    height: 380,
+    gsm: 90,
+    handleType: 'FLAT HANDLE',
+    paperGrade: 'VIRGIN',
+    cert: 'FSC',
+    existingBOM: [],
+    boxQty: 250
+  };
+}
+
+function isPSLFormat(data: any[]): boolean {
+  if (!data || data.length < 2) return false;
+  
+  const firstRow = data[0];
+  const allKeys = Object.keys(firstRow || {}).join('|').toLowerCase();
+  
+  const hasSAPCode = allKeys.includes('sap code');
+  const hasDesc = allKeys.includes('desc');
+  const hasPaper = allKeys.includes('paper');
+  const hasMonthlyReq = allKeys.includes('monthly requirement');
+  const hasMonthData = allKeys.includes('requirement') && 
+                      (allKeys.includes('aug') || allKeys.includes('sept') || allKeys.includes('oct'));
+  
+  return hasSAPCode && hasDesc && hasPaper && hasMonthlyReq && hasMonthData;
+}
+
+function convertPSLCSVToInternalFormat(rawRows: any[][]): any[] {
+  if (!rawRows || rawRows.length < 3) return [];
+  
+  const monthRow = rawRows[0];
+  const headerRow = rawRows[1];
+  const dataRows = rawRows.slice(2);
+  
+  const requirementColumnIndices: number[] = [];
+  monthRow.forEach((header: any, index: number) => {
+    const headerStr = header ? header.toString().trim().toLowerCase() : '';
+    
+    const isMonthColumn = headerStr.includes('requirement') ||
+                         headerStr.includes('req') ||
+                         /^\d{2}-[a-z]{3}$/.test(headerStr) ||
+                         /^[a-z]{3}$/.test(headerStr) ||
+                         /^[a-z]{3}\s+requirement$/i.test(headerStr) ||
+                         /^[a-z]{3}\s+req$/i.test(headerStr) ||
+                         /^\d{4}-\d{2}$/.test(headerStr) ||
+                         /^[a-z]{3,9}\s*\d{4}$/i.test(headerStr);
+    
+    if (isMonthColumn && headerStr !== '' && headerStr !== 'sap code' && headerStr !== 'desc') {
+      requirementColumnIndices.push(index);
+    }
+  });
+  
+  let allOrders: any[] = [];
+  let processedCount = 0;
+  let skippedCount = 0;
+  
+  dataRows.forEach((row: any[], rowIndex: number) => {
+    try {
+      if (!Array.isArray(row) || row.length < 5) {
+        skippedCount++;
+        return;
+      }
+      
+      const bagType = cleanValue(row[0]);
+      const sapCode = cleanValue(row[1]);
+      const productName = cleanValue(row[2]);
+      const rollWidth = parseNumericValue(row[3]);
+      const monthlyCartons = parseNumericValue(row[4]);
+      const weeklyUsage = parseNumericValue(row[5]);
+      const bagsPerCarton = parseNumericValue(row[6]) || 1000;
+      
+      if (!sapCode || !productName || sapCode.toString().trim() === '' || productName.toString().trim() === '') {
+        skippedCount++;
+        return;
+      }
+      
+      if (productName.toString().toLowerCase().includes('mto')) {
+        skippedCount++;
+        return;
+      }
+      
+      let totalBagsRequired = 0;
+      const monthlyBreakdown: any = {};
+      
+      requirementColumnIndices.forEach(colIndex => {
+        const monthName = monthRow[colIndex];
+        let bagsInMonth = parseNumericValue(row[colIndex]) || 0;
+        
+        if (typeof row[colIndex] === 'string' && row[colIndex].includes(',')) {
+          const cleanedNumber = row[colIndex].replace(/,/g, '');
+          bagsInMonth = parseFloat(cleanedNumber) || 0;
+        }
+        
+        if (bagsInMonth > 0) {
+          monthlyBreakdown[monthName] = bagsInMonth;
+          totalBagsRequired += bagsInMonth;
+        }
+      });
+      
+      if (totalBagsRequired === 0 && monthlyCartons > 0) {
+        totalBagsRequired = monthlyCartons * bagsPerCarton;
+      }
+      
+      if (totalBagsRequired <= 0) {
+        skippedCount++;
+        return;
+      }
+      
+      const bagSpecs = getBagSpecsFromSAPCode(sapCode.toString());
+      const finalBagName = productName.toString().trim();
+      
+      allOrders.push({
+        bagName: finalBagName,
+        sku: sapCode.toString(),
+        orderQty: totalBagsRequired,
+        orderUnit: 'bags',
+        
+        width: bagSpecs.width,
+        gusset: bagSpecs.gusset,
+        height: bagSpecs.height,
+        gsm: bagSpecs.gsm,
+        handleType: bagSpecs.handleType,
+        paperGrade: bagSpecs.paperGrade,
+        certification: bagSpecs.cert,
+        
+        rollWidth: rollWidth,
+        originalSAPCode: sapCode,
+        monthlyBreakdown: monthlyBreakdown,
+        totalBagsRequired: totalBagsRequired,
+        bagsPerCarton: bagsPerCarton,
+        weeklyUsage: weeklyUsage,
+        
+        sourceRow: rowIndex + 3,
+        sourceFormat: 'PSL_CSV_CORRECTED'
+      });
+      
+      processedCount++;
+      
+    } catch (error) {
+      console.error(`Error processing CSV row ${rowIndex + 3}:`, error);
+      skippedCount++;
+    }
+  });
+  
+  return allOrders;
+}
+
+function consolidateOrdersByClient(orders: any[]): any[] {
+  if (!orders || orders.length === 0) {
+    return [];
+  }
+  
+  const orderGroups = new Map<string, any[]>();
+  
+  orders.forEach(order => {
+    const key = order.sku || order.originalSAPCode || order.bagName || 'unknown';
+    if (!orderGroups.has(key)) {
+      orderGroups.set(key, []);
+    }
+    orderGroups.get(key)!.push(order);
+  });
+  
+  const consolidatedOrders: any[] = [];
+  
+  orderGroups.forEach((groupOrders, sapCode) => {
+    if (groupOrders.length === 1) {
+      consolidatedOrders.push(groupOrders[0]);
+      return;
+    }
+    
+    const firstOrder = groupOrders[0];
+    let totalBags = 0;
+    let totalCartons = 0;
+    const combinedMonthlyBreakdown: any = {};
+    
+    groupOrders.forEach((order) => {
+      if (order.totalBagsRequired) {
+        totalBags += order.totalBagsRequired;
+      } else if (order.orderUnit === 'bags') {
+        totalBags += order.orderQty;
+      } else if (order.orderUnit === 'cartons') {
+        const bagsPerCarton = order.bagsPerCarton || 1000;
+        totalBags += order.orderQty * bagsPerCarton;
+        totalCartons += order.orderQty;
+      }
+      
+      if (order.monthlyBreakdown) {
+        Object.entries(order.monthlyBreakdown).forEach(([month, bags]) => {
+          combinedMonthlyBreakdown[month] = (combinedMonthlyBreakdown[month] || 0) + (bags as number);
+        });
+      }
+    });
+    
+    const consolidatedOrder = {
+      ...firstOrder,
+      orderQty: totalBags,
+      orderUnit: 'bags',
+      totalBagsRequired: totalBags,
+      monthlyBreakdown: combinedMonthlyBreakdown,
+      consolidatedFrom: groupOrders.length,
+      sourceFormat: firstOrder.sourceFormat + '_CONSOLIDATED'
+    };
+    
+    consolidatedOrders.push(consolidatedOrder);
+  });
+  
+  return consolidatedOrders;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -192,7 +471,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
 
-    const validatedOrders = validateOrderData(parsedData);
+    const consolidatedData = consolidateOrdersByClient(parsedData);
+    const validatedOrders = validateOrderData(consolidatedData);
     
     const { results: calculatedOrders, summary } = await processOrdersWithSequentialInventory(validatedOrders);
     
@@ -248,20 +528,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 async function parseCSV(buffer: Buffer): Promise<any[]> {
   return new Promise((resolve, reject) => {
-    const records: any[] = [];
+    const allRows: any[][] = [];
     parse(buffer, {
-      columns: true,
+      columns: false,
       skip_empty_lines: true,
       delimiter: ',',
     })
     .on('readable', function(this: any) {
       let record;
       while (record = this.read()) {
-        records.push(record);
+        allRows.push(record);
       }
     })
     .on('error', reject)
-    .on('end', () => resolve(records));
+    .on('end', () => {
+      if (allRows.length >= 3 && 
+          allRows[1] && 
+          allRows[1].join('|').toLowerCase().includes('sap code') &&
+          allRows[1].join('|').toLowerCase().includes('desc')) {
+        
+        console.log('🔍 Detected PSL format in CSV - converting...');
+        const convertedData = convertPSLCSVToInternalFormat(allRows);
+        resolve(convertedData);
+      } else {
+        console.log('📊 Standard CSV format - reparsing with headers...');
+        const standardRecords: any[] = [];
+        parse(buffer, {
+          columns: true,
+          skip_empty_lines: true,
+          delimiter: ',',
+        })
+        .on('readable', function(this: any) {
+          let record;
+          while (record = this.read()) {
+            standardRecords.push(record);
+          }
+        })
+        .on('error', reject)
+        .on('end', () => resolve(standardRecords));
+      }
+    });
   });
 }
 
