@@ -43,12 +43,12 @@ type MaterialRequirement = {
   shortage: number;
   unit: string;
   status: 'sufficient' | 'low' | 'critical';
-  cost: number;
+  // cost: number;
 };
 
 type InventoryAnalysis = {
   feasible: boolean;
-  totalCost: number;
+  // totalCost: number;
   materialRequirements: MaterialRequirement[];
   warnings: string[];
   recommendations: string[];
@@ -298,8 +298,8 @@ export default function CombinedCalculator() {
       const required = Math.round((item.quantity * actualBags) * 1000) / 1000;
       const available = currentStock;
       const shortage = Math.max(0, Math.round((required - available) * 1000) / 1000);
-      const estimatedPrice = 10; // Default price since we don't have inventory data
-      const cost = required * estimatedPrice;
+      // const estimatedPrice = 10; // Default price since we don't have inventory data
+      // const cost = required * estimatedPrice;
       
       let status: 'sufficient' | 'low' | 'critical' = 'sufficient';
       if (shortage > 0) {
@@ -320,11 +320,11 @@ export default function CombinedCalculator() {
         available,
         shortage,
         unit: item.unit,
-        status,
-        cost
+        status
+        // cost
       });
 
-      totalCost += cost;
+      // totalCost += cost;
     });
 
     return {
@@ -863,10 +863,10 @@ export default function CombinedCalculator() {
                         {orderUnit === 'cartons' && <span className="text-sm text-muted-foreground ml-1">({orderQty} cartons)</span>}
                       </div>
                     </div>
-                    <div>
+                    {/* <div>
                       <span className="text-muted-foreground">Total Cost:</span>
                       <div className="font-bold">€{inventoryResults?.totalCost.toFixed(2) || '0.00'}</div>
-                    </div>
+                    </div> */}
                     <div>
                       <span className="text-muted-foreground">Delivery Time:</span>
                       <div className="font-bold">{deliveryDays} days</div>
@@ -1055,9 +1055,9 @@ export default function CombinedCalculator() {
                             {inventoryResults.feasible ? 'Inventory Sufficient' : 'Insufficient Inventory'}
                           </strong>
                           <br />
-                          <span className="text-sm opacity-80">
+                          {/* <span className="text-sm opacity-80">
                             Total material cost: €{inventoryResults.totalCost.toFixed(2)}
-                          </span>
+                          </span> */}
                         </div>
                       </div>
                     </AlertDescription>
@@ -1106,7 +1106,7 @@ export default function CombinedCalculator() {
                         <th className="text-right px-2 py-2 font-semibold text-slate-700 text-xs tracking-wide">Required</th>
                         <th className="text-right px-2 py-2 font-semibold text-slate-700 text-xs tracking-wide">Available</th>
                         <th className="text-right px-2 py-2 font-semibold text-slate-700 text-xs tracking-wide">After Order</th>
-                        <th className="text-right px-2 py-2 font-semibold text-slate-700 text-xs tracking-wide">Cost</th>
+                        {/* <th className="text-right px-2 py-2 font-semibold text-slate-700 text-xs tracking-wide">Cost</th> */}
                         <th className="text-center px-2 py-2 font-semibold text-slate-700 text-xs tracking-wide">Status</th>
                       </tr>
                     </thead>
@@ -1144,9 +1144,9 @@ export default function CombinedCalculator() {
                               </span>
                             )}
                           </td>
-                          <td className="text-right px-2 py-2 font-mono font-semibold text-slate-900 text-xs">
+                          {/* <td className="text-right px-2 py-2 font-mono font-semibold text-slate-900 text-xs">
                             €{req.cost.toFixed(2)}
-                          </td>
+                          </td> */}
                           <td className="text-center px-2 py-2">
                             <Badge 
                               variant={req.status === 'critical' ? 'destructive' : req.status === 'low' ? 'secondary' : 'default'}

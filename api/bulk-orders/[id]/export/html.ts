@@ -133,7 +133,7 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
   const currentInventory = await fetchCurrentInventory();
   const totalOrders = parseInt(bulkOrder.totalOrders) || 0;
   const feasible = parseInt(bulkOrder.feasible) || 0;
-  const totalCost = parseFloat(bulkOrder.totalCost) || 0;
+  // const totalCost = parseFloat(bulkOrder.totalCost) || 0;
   const successRate = totalOrders > 0 ? ((feasible / totalOrders) * 100).toFixed(3) : '0.000';
   
   return `
@@ -261,7 +261,6 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
             }
             
             .success-rate { color: var(--success); }
-            .total-cost { color: var(--primary); }
             .total-orders { color: var(--foreground); }
             .feasible-orders { color: var(--warning); }
             
@@ -318,11 +317,6 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
                 margin-right: 8px; 
             }
             
-            .cost { 
-                font-weight: 600; 
-                color: var(--foreground);
-                font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace;
-            }
             
             .machine-assignment { 
                 background: hsl(221.2 83.2% 97%);
@@ -474,10 +468,6 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
                             <div class="summary-number success-rate">${successRate}%</div>
                             <div class="summary-label">Success Rate</div>
                         </div>
-                        <div class="summary-item">
-                            <div class="summary-number total-cost">€${totalCost.toFixed(3)}</div>
-                            <div class="summary-label">Total Cost</div>
-                        </div>
                     </div>
                 </div>
 
@@ -487,10 +477,9 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
                 <tr>
                     <th>Order</th>
                     <th>Bag Name</th>
+                    <th>SAP Code</th>
                     <th>Dimensions (mm)</th>
                     <th>Quantity</th>
-                    <th>Unit Cost</th>
-                    <th>Total Cost</th>
                     <th>Status</th>
                 </tr>
             </thead>
@@ -501,16 +490,12 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
                             <span class="order-number">#${order.processingOrder || index + 1}</span>
                         </td>
                         <td><strong>${order.bagName || 'Custom Bag'}</strong></td>
-                        <td>${order.specs ? `${order.specs.width}×${order.specs.gusset}×${order.specs.height}` : 'N/A'}</td>
+                        <td>${order.originalSAPCode || order.sku || '-'}</td>
+                        <td>${order.specs ? `${order.specs.width}×${order.specs.gusset}×${order.specs.height}${order.rollWidth ? ` (Roll: ${order.rollWidth}mm)` : ''}` : 'N/A'}</td>
                         <td>${(() => {
                             const bags = order.actualBags || (order.orderUnit === 'cartons' ? order.orderQty * 250 : order.orderQty);
                             return bags?.toLocaleString() || 0;
                         })()} bags</td>
-                        <td>€${(() => {
-                            const bags = order.actualBags || (order.orderUnit === 'cartons' ? order.orderQty * 250 : order.orderQty) || 1;
-                            return ((order.totalCost || 0) / bags).toFixed(3);
-                        })()}</td>
-                        <td class="cost">€${(order.totalCost || 0).toFixed(3)}</td>
                         <td class="${order.feasible ? 'status-feasible' : 'status-not-feasible'}">
                             ${order.feasible ? 'Feasible' : 'Not Feasible'}
                             ${order.assignedMachine ? `<div class="machine-assignment">Machine: ${order.assignedMachine}</div>` : ''}
@@ -606,9 +591,9 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
                                         <td><strong>${material.type}</strong></td>
                                         <td>${material.sapCode}</td>
                                         <td>${material.description}</td>
-                                        <td class="cost">${material.totalRequired.toFixed(3)}</td>
+                                        <td>${material.totalRequired.toFixed(3)}</td>
                                         <td>${material.unit}</td>
-                                        <td class="cost">${material.availableStock.toFixed(3)}</td>
+                                        <td>${material.availableStock.toFixed(3)}</td>
                                         <td class="${hasShortage ? 'status-not-feasible' : 'status-feasible'}">
                                             ${hasShortage ? `${shortage.toFixed(3)} (${shortagePercentage.toFixed(3)}%)` : '0.000 (0.000%)'}
                                         </td>
@@ -637,7 +622,7 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
                             <strong>Specifications:</strong><br>
                             <div class="spec-row">
                                 <span class="spec-label">Dimensions:</span> 
-                                <span class="spec-value">${order.specs.width} × ${order.specs.gusset} × ${order.specs.height} mm</span>
+                                <span class="spec-value">${order.specs.width} × ${order.specs.gusset} × ${order.specs.height} mm${order.rollWidth ? ` | Roll Width: ${order.rollWidth}mm` : ''}</span>
                             </div>
                             <div class="spec-row">
                                 <span class="spec-label">GSM:</span> 
@@ -659,10 +644,6 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
                                     return `${bags.toLocaleString()} bags${cartonsText}`;
                                 })()}</span>
                             </div>
-                            <div class="spec-row">
-                                <span class="spec-label">Total Cost:</span> 
-                                <span class="cost">€${(order.totalCost || 0).toFixed(3)}</span>
-                            </div>
                         </div>
                     ` : ''}
                     
@@ -676,7 +657,6 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
                                     <th>Description</th>
                                     <th>Quantity</th>
                                     <th>Unit</th>
-                                    <th>Cost</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -687,7 +667,6 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
                                         <td>${item.description}</td>
                                         <td>${item.totalQuantity?.toFixed(3) || 'N/A'}</td>
                                         <td>${item.unit}</td>
-                                        <td class="cost">€${item.totalCost?.toFixed(3) || '0.000'}</td>
                                     </tr>
                                 `).join('')}
                             </tbody>
@@ -717,7 +696,7 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
                                     <tr>
                                         <td>${material.sapCode}</td>
                                         <td>${material.description || 'N/A'}</td>
-                                        <td class="cost">${material.consumed?.toFixed(3) || 'N/A'}</td>
+                                        <td>${material.consumed?.toFixed(3) || 'N/A'}</td>
                                         <td>${material.remaining?.toFixed(3) || 'N/A'}</td>
                                     </tr>
                                 `).join('')}

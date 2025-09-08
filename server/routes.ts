@@ -7,6 +7,15 @@ import * as XLSX from "xlsx";
 import puppeteer from "puppeteer";
 import { z } from "zod";
 import { SKU_DATA } from "../client/src/data/skuData.ts";
+import { 
+  getMachineFleet, 
+  calculateMachineAnalytics, 
+  generateProductionTimeline, 
+  analyzeProductionBottlenecks,
+  type MachineSpec, 
+  type MachineAnalytics, 
+  type ProductionTimelineEvent 
+} from "../client/src/data/machinesData";
 
 interface MulterRequest extends Request {
   file?: Express.Multer.File;
@@ -373,74 +382,21 @@ function consolidateOrdersByClient(orders: any[]): any[] {
   return consolidatedOrders;
 }
 
-// Machine configuration and availability tracking
-interface MachineSpec {
-  id: string;
-  name: string;
-  maxWidth: number;
-  maxHeight: number;
-  maxGusset: number;
-  minGsm: number;
-  maxGsm: number;
-  supportedHandles: string[];
-  capacity: number; // bags per hour
-  available: boolean;
-  nextAvailableTime: Date;
-}
-
+// Enhanced machine configuration and availability tracking
 interface MachineSchedule {
   machineId: string;
   orderId: string;
   startTime: Date;
   endTime: Date;
   bagQuantity: number;
+  setupTimeMinutes?: number;
+  productionHours?: number;
+  totalHours?: number;
 }
 
 // Initialize machine fleet
 function initializeMachineFleet(): MachineSpec[] {
-  const baseTime = new Date();
-  
-  return [
-    {
-      id: 'MACHINE_01',
-      name: 'High Speed Paper Bag Machine #1',
-      maxWidth: 450,
-      maxHeight: 600,
-      maxGusset: 200,
-      minGsm: 50,
-      maxGsm: 120,
-      supportedHandles: ['FLAT HANDLE', 'TWISTED HANDLE'],
-      capacity: 15000, // bags per hour
-      available: true,
-      nextAvailableTime: baseTime
-    },
-    {
-      id: 'MACHINE_02', 
-      name: 'Standard Paper Bag Machine #2',
-      maxWidth: 400,
-      maxHeight: 500,
-      maxGusset: 180,
-      minGsm: 40,
-      maxGsm: 100,
-      supportedHandles: ['FLAT HANDLE'],
-      capacity: 12000, // bags per hour
-      available: true,
-      nextAvailableTime: baseTime
-    },
-    {
-      id: 'MACHINE_03',
-      name: 'Premium Handle Machine #3',
-      maxWidth: 350,
-      maxHeight: 450,
-      maxGusset: 160,
-      minGsm: 70,
-      maxGsm: 120,
-      supportedHandles: ['TWISTED HANDLE'],
-      capacity: 8000, // bags per hour
-      available: true,
-      nextAvailableTime: baseTime
-    }
-  ];
+  return getMachineFleet();
 }
 
 // Helper function to check inventory with running total
@@ -506,14 +462,14 @@ function calculateMachineScore(machine: MachineSpec, specs: any, bagQuantity: nu
     score = 0;
   }
   
-  if (specs.handleType === 'TWISTED HANDLE' && machine.id === 'MACHINE_03') {
+  if (specs.handleType === 'TWISTED HANDLE' && machine.id === 'M6') {
     score += 10;
-  } else if (specs.handleType === 'FLAT HANDLE' && machine.id === 'MACHINE_01') {
+  } else if (specs.handleType === 'FLAT HANDLE' && machine.id === 'M1') {
     score += 5;
   }
   
   if (bagQuantity > 50000) {
-    score += 5 * (machine.capacity / 15000);
+    score += 5 * (machine.capacity / 82000);
   }
   
   return Math.max(0, score);
@@ -555,21 +511,36 @@ function findAvailableMachine(specs: any, machines: MachineSpec[], deliveryDays:
   return { machine: selectedMachine, scheduledEndTime };
 }
 
-// Helper function to schedule production on machine
+// Enhanced function to schedule production on machine with setup time and capacity tracking
 function scheduleProductionOnMachine(machine: MachineSpec, bagQuantity: number, orderId: string): MachineSchedule {
-  const productionHours = Math.ceil(bagQuantity / machine.capacity);
-  const startTime = new Date(machine.nextAvailableTime);
-  const endTime = new Date(startTime.getTime() + productionHours * 60 * 60 * 1000); // Add hours in milliseconds
+  // Calculate production time including setup time and efficiency
+  const setupHours = machine.setupTimeMinutes / 60;
+  const baseProductionHours = bagQuantity / machine.hourlyCapacity;
+  const adjustedProductionHours = baseProductionHours / machine.efficiency;
+  const totalHours = setupHours + adjustedProductionHours;
   
-  // Update machine availability
+  const startTime = new Date(machine.nextAvailableTime);
+  const endTime = new Date(startTime.getTime() + totalHours * 60 * 60 * 1000);
+  
+  // Update machine scheduling metrics
+  machine.scheduledBags += bagQuantity;
+  machine.scheduledHours += totalHours;
+  machine.remainingDailyCapacity = Math.max(0, machine.capacity - machine.scheduledBags);
   machine.nextAvailableTime = endTime;
+  
+  console.log(`📅 Scheduled ${bagQuantity.toLocaleString()} bags on ${machine.name}`);
+  console.log(`   Setup: ${machine.setupTimeMinutes}min, Production: ${adjustedProductionHours.toFixed(2)}h, Total: ${totalHours.toFixed(2)}h`);
+  console.log(`   Machine now has ${machine.remainingDailyCapacity.toLocaleString()} bags remaining capacity`);
   
   return {
     machineId: machine.id,
     orderId,
     startTime,
     endTime,
-    bagQuantity
+    bagQuantity,
+    setupTimeMinutes: machine.setupTimeMinutes,
+    productionHours: adjustedProductionHours,
+    totalHours
   };
 }
 
@@ -1577,21 +1548,120 @@ async function processOrdersWithSequentialInventory(orders: any[]): Promise<{res
     remaining
   }));
   
+  // Calculate comprehensive machine analytics
+  const machineAnalytics = calculateMachineAnalytics(machineFleet, productionSchedule);
+  const productionTimeline = generateProductionTimeline(machineFleet, productionSchedule);
+  const bottleneckAnalysis = analyzeProductionBottlenecks(machineFleet, productionSchedule);
+  
+  // Calculate total production costs
+  const totalOperatorCosts = machineFleet.reduce((sum, machine) => 
+    sum + (machine.scheduledHours * machine.operatorCostPerHour), 0);
+  const totalEnergyCosts = machineFleet.reduce((sum, machine) => 
+    sum + (machine.scheduledHours * machine.energyCostPerHour), 0);
+  const totalMaintenanceCosts = machineFleet.reduce((sum, machine) => 
+    sum + machine.maintenanceCostPerDay, 0);
+  
+  // Enhanced summary with comprehensive machine data
   const summary = {
+    // Basic order statistics
     totalOrders: orders.length,
     feasibleOrders: feasibleOrdersCount,
     totalCost: totalProcessedCost,
     remainingInventory,
     productionSchedule,
+    
+    // Detailed machine utilization
     machineUtilization: machineFleet.map(machine => ({
       machineId: machine.id,
       machineName: machine.name,
       nextAvailable: machine.nextAvailableTime,
-      scheduledOrders: productionSchedule.filter(s => s.machineId === machine.id).length
-    }))
+      scheduledOrders: productionSchedule.filter(s => s.machineId === machine.id).length,
+      scheduledBags: machine.scheduledBags,
+      scheduledHours: machine.scheduledHours,
+      remainingDailyCapacity: machine.remainingDailyCapacity,
+      utilizationPercentage: ((machine.scheduledHours / machine.workingHoursPerDay) * 100).toFixed(1) + '%',
+      dailyCapacity: machine.capacity,
+      hourlyCapacity: machine.hourlyCapacity,
+      efficiency: machine.efficiency,
+      operatorCostPerHour: machine.operatorCostPerHour,
+      energyCostPerHour: machine.energyCostPerHour,
+      setupTimeMinutes: machine.setupTimeMinutes,
+      status: machine.available ? 'Available' : 'Busy',
+      estimatedCompletionTime: machine.nextAvailableTime
+    })),
+    
+    // Comprehensive analytics
+    machineAnalytics,
+    productionTimeline,
+    bottleneckAnalysis,
+    
+    // Production statistics
+    productionStatistics: {
+      totalBagsScheduled: machineFleet.reduce((sum, machine) => sum + machine.scheduledBags, 0),
+      totalProductionHours: machineFleet.reduce((sum, machine) => sum + machine.scheduledHours, 0),
+      averageUtilization: ((machineFleet.reduce((sum, machine) => sum + (machine.scheduledHours / machine.workingHoursPerDay), 0) / machineFleet.length) * 100).toFixed(1) + '%',
+      totalSetupTime: productionSchedule.reduce((sum, order) => 
+        sum + (machineFleet.find(m => m.id === order.machineId)?.setupTimeMinutes || 0), 0),
+      productionEfficiency: ((machineFleet.reduce((sum, machine) => sum + machine.efficiency, 0) / machineFleet.length) * 100).toFixed(1) + '%'
+    },
+    
+    // Cost breakdown
+    costAnalysis: {
+      materialCosts: totalProcessedCost,
+      operatorCosts: totalOperatorCosts,
+      energyCosts: totalEnergyCosts,
+      maintenanceCosts: totalMaintenanceCosts,
+      totalProductionCosts: totalOperatorCosts + totalEnergyCosts + totalMaintenanceCosts,
+      grandTotal: totalProcessedCost + totalOperatorCosts + totalEnergyCosts + totalMaintenanceCosts
+    },
+    
+    // Machine performance rankings
+    machineRankings: {
+      mostUtilized: machineFleet
+        .sort((a, b) => b.scheduledHours - a.scheduledHours)
+        .slice(0, 3)
+        .map(machine => ({ 
+          name: machine.name, 
+          utilization: ((machine.scheduledHours / machine.workingHoursPerDay) * 100).toFixed(1) + '%',
+          bags: machine.scheduledBags 
+        })),
+      leastUtilized: machineFleet
+        .sort((a, b) => a.scheduledHours - b.scheduledHours)
+        .slice(0, 3)
+        .map(machine => ({ 
+          name: machine.name, 
+          utilization: ((machine.scheduledHours / machine.workingHoursPerDay) * 100).toFixed(1) + '%',
+          remainingCapacity: machine.remainingDailyCapacity 
+        })),
+      mostEfficient: machineFleet
+        .sort((a, b) => b.efficiency - a.efficiency)
+        .slice(0, 3)
+        .map(machine => ({ 
+          name: machine.name, 
+          efficiency: (machine.efficiency * 100).toFixed(1) + '%',
+          hourlyCapacity: machine.hourlyCapacity 
+        }))
+    }
   };
   
   console.log(`🎯 Sequential processing complete: ${feasibleOrdersCount}/${orders.length} orders feasible`);
+  console.log(`📊 Production Statistics:`);
+  console.log(`   Total bags scheduled: ${summary.productionStatistics.totalBagsScheduled.toLocaleString()}`);
+  console.log(`   Total production hours: ${summary.productionStatistics.totalProductionHours.toFixed(1)}`);
+  console.log(`   Average utilization: ${summary.productionStatistics.averageUtilization}`);
+  console.log(`   Production efficiency: ${summary.productionStatistics.productionEfficiency}`);
+  console.log(`💰 Cost Analysis:`);
+  console.log(`   Material costs: €${summary.costAnalysis.materialCosts.toFixed(2)}`);
+  console.log(`   Production costs: €${summary.costAnalysis.totalProductionCosts.toFixed(2)}`);
+  console.log(`   Grand total: €${summary.costAnalysis.grandTotal.toFixed(2)}`);
+  
+  if (bottleneckAnalysis.bottlenecks.length > 0) {
+    console.log(`⚠️  Bottlenecks detected on machines: ${bottleneckAnalysis.bottlenecks.map(b => b.machineName).join(', ')}`);
+  }
+  
+  if (bottleneckAnalysis.loadBalancingSuggestions.length > 0) {
+    console.log(`💡 Load balancing suggestions available (${bottleneckAnalysis.loadBalancingSuggestions.length})`);
+  }
   
   return { results, summary };
 }
@@ -2327,7 +2397,7 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
                     <th>Dimensions (mm)</th>
                     <th>Quantity</th>
                     <th>Unit Cost</th>
-                    <th>Total Cost</th>
+                    // <th>Total Cost</th>
                     <th>Status</th>
                 </tr>
             </thead>
@@ -2527,10 +2597,10 @@ async function generateHTMLReport(bulkOrder: any): Promise<string> {
                                 <span class="spec-label">Quantity:</span> 
                                 <span class="spec-value">${(order.actualBags || (order.orderUnit === 'cartons' ? order.orderQty * (order.bagsPerCarton || 1000) : order.orderQty) || 0).toLocaleString()} bags ${order.orderUnit === 'cartons' ? `(${order.orderQty} cartons)` : ''}</span>
                             </div>
-                            <div class="spec-row">
-                                <span class="spec-label">Total Cost:</span> 
-                                <span class="cost">€${(order.totalCost || 0).toFixed(2)}</span>
-                            </div>
+                            // <div class="spec-row">
+                            //     <span class="spec-label">Total Cost:</span> 
+                            //     <span class="cost">€${(order.totalCost || 0).toFixed(2)}</span>
+                            // </div>
                         </div>
                     ` : ''}
                     

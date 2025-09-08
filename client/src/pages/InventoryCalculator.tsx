@@ -51,12 +51,12 @@ type MaterialRequirement = {
   shortage: number;
   unit: string;
   status: 'sufficient' | 'low' | 'critical';
-  cost: number;
+  // cost: number;
 };
 
 type InventoryAnalysis = {
   feasible: boolean;
-  totalCost: number;
+  // totalCost: number;
   materialRequirements: MaterialRequirement[];
   warnings: string[];
   recommendations: string[];
@@ -203,7 +203,7 @@ export default function InventoryCalculator() {
 
     // Calculate material requirements
     const materialRequirements: MaterialRequirement[] = [];
-    let totalCost = 0;
+    // let totalCost = 0;
     let feasible = true;
     const warnings: string[] = [];
     const recommendations: string[] = [];
@@ -215,7 +215,7 @@ export default function InventoryCalculator() {
       const required = Math.round((item.quantity * actualBags) * 1000) / 1000;
       const available = stockData[item.sapCode] ?? 0;
       const shortage = Math.max(0, Math.round((required - available) * 1000) / 1000);
-      const cost = required * inventoryItem.price;
+      // const cost = required * inventoryItem.price;
       
       let status: 'sufficient' | 'low' | 'critical' = 'sufficient';
       if (shortage > 0) {
@@ -237,10 +237,10 @@ export default function InventoryCalculator() {
         shortage,
         unit: item.unit,
         status,
-        cost
+        // cost
       });
 
-      totalCost += cost;
+      // totalCost += cost;
     });
 
     // Check delivery date feasibility
@@ -262,7 +262,7 @@ export default function InventoryCalculator() {
 
     setAnalysis({
       feasible,
-      totalCost,
+      // totalCost,
       materialRequirements,
       warnings,
       recommendations
@@ -301,12 +301,12 @@ export default function InventoryCalculator() {
   const inventoryStats = Object.entries(INVENTORY_DATA).reduce((acc, [sapCode, item]) => {
     const currentStock = stockData[sapCode] ?? 0;
     const stockStatus = getStockStatus(currentStock, item.minStock);
-    acc.totalValue += currentStock * item.price;
+    // acc.totalValue += currentStock * item.price;
     acc.totalItems += 1;
     if (stockStatus.status === 'low') acc.lowStock += 1;
     if (stockStatus.status === 'critical') acc.critical += 1;
     return acc;
-  }, { totalValue: 0, totalItems: 0, lowStock: 0, critical: 0 });
+  }, { /* totalValue: 0, */ totalItems: 0, lowStock: 0, critical: 0 });
 
   return (
     <div className="min-h-screen">
@@ -323,10 +323,10 @@ export default function InventoryCalculator() {
       <main className="container section-padding">
         {/* Status Cards */}
         <div className="metric-grid mb-8">
-          <Card className="p-6 text-center metric-card-1">
+          {/* <Card className="p-6 text-center metric-card-1">
             <div className="text-2xl font-semibold mb-1 text-blue-900">€{inventoryStats.totalValue.toFixed(0)}</div>
             <h4 className="text-sm font-medium text-blue-700">Total Stock Value</h4>
-          </Card>
+          </Card> */}
           <Card className="p-6 text-center metric-card-2">
             <div className="text-2xl font-semibold mb-1 text-green-900">{inventoryStats.totalItems}</div>
             <h4 className="text-sm font-medium text-green-700">Materials in Stock</h4>
@@ -491,7 +491,7 @@ export default function InventoryCalculator() {
                           <div>
                             <strong className="text-base">{analysis.feasible ? 'Order Feasible' : 'Order Not Feasible'}</strong>
                             <br />
-                            <span className="text-sm opacity-80">Total material cost: €{analysis.totalCost.toFixed(2)}</span>
+                            {/* <span className="text-sm opacity-80">Total material cost: €{analysis.totalCost.toFixed(2)}</span> */}
                           </div>
                         </div>
                       </AlertDescription>
@@ -688,7 +688,7 @@ export default function InventoryCalculator() {
                         const currentStock = stockData[sapCode] ?? 0;
                         const stockStatus = getStockStatus(currentStock, item.minStock);
                         const suggestedOrder = (item.minStock * 2).toFixed(item.unit === 'PC' ? 0 : 1);
-                        const cost = (parseFloat(suggestedOrder) * item.price).toFixed(2);
+                        // const cost = (parseFloat(suggestedOrder) * item.price).toFixed(2);
                         return (
                           <Alert key={sapCode} className={stockStatus.status === 'critical' ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200'}>
                             <div className="flex items-center gap-2">
@@ -706,7 +706,7 @@ export default function InventoryCalculator() {
                                   <div className="mt-2 text-sm">
                                     <span className="font-medium">Suggested order: </span>
                                     <span className="font-mono bg-background px-2 py-1 rounded border">{suggestedOrder}{item.unit}</span>
-                                    <span className="ml-2 text-muted-foreground">(Cost: €{cost})</span>
+                                    {/* <span className="ml-2 text-muted-foreground">(Cost: €{cost})</span> */}
                                   </div>
                                 </div>
                                 <Badge 
@@ -757,7 +757,7 @@ export default function InventoryCalculator() {
                       <th className="text-right px-2 py-2 font-semibold text-slate-700 text-xs tracking-wide">Required</th>
                       <th className="text-right px-2 py-2 font-semibold text-slate-700 text-xs tracking-wide">Available</th>
                       <th className="text-right px-2 py-2 font-semibold text-slate-700 text-xs tracking-wide">After Order</th>
-                      <th className="text-right px-2 py-2 font-semibold text-slate-700 text-xs tracking-wide">Cost</th>
+                      {/* <th className="text-right px-2 py-2 font-semibold text-slate-700 text-xs tracking-wide">Cost</th> */}
                       <th className="text-center px-2 py-2 font-semibold text-slate-700 text-xs tracking-wide">Status</th>
                     </tr>
                   </thead>
@@ -797,9 +797,9 @@ export default function InventoryCalculator() {
                               </span>
                             )}
                           </td>
-                          <td className="text-right px-2 py-2 font-mono font-semibold text-slate-900 text-xs">
+                          {/* <td className="text-right px-2 py-2 font-mono font-semibold text-slate-900 text-xs">
                             €{req.cost.toFixed(2)}
-                          </td>
+                          </td> */}
                           <td className="text-center px-2 py-2">
                             <Badge 
                               variant={req.status === 'critical' ? 'destructive' : req.status === 'low' ? 'secondary' : 'default'}

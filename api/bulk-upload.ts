@@ -1120,19 +1120,14 @@ async function fetchAllInventory(): Promise<Map<string, number>> {
   }
 }
 
-interface MachineSpec {
-  id: string;
-  name: string;
-  maxWidth: number;
-  maxHeight: number;
-  maxGusset: number;
-  minGsm: number;
-  maxGsm: number;
-  supportedHandles: string[];
-  capacity: number;
-  available: boolean;
-  nextAvailableTime: Date;
-}
+import { 
+  getMachineFleet, 
+  calculateMachineAnalytics, 
+  generateProductionTimeline, 
+  analyzeProductionBottlenecks,
+  type MachineSpec, 
+  type MachineAnalytics 
+} from '../client/src/data/machinesData';
 
 interface MachineSchedule {
   machineId: string;
@@ -1140,52 +1135,13 @@ interface MachineSchedule {
   startTime: Date;
   endTime: Date;
   bagQuantity: number;
+  setupTimeMinutes?: number;
+  productionHours?: number;
+  totalHours?: number;
 }
 
 function initializeMachineFleet(): MachineSpec[] {
-  const baseTime = new Date();
-  
-  return [
-    {
-      id: 'MACHINE_01',
-      name: 'High Speed Paper Bag Machine #1',
-      maxWidth: 450,
-      maxHeight: 600,
-      maxGusset: 200,
-      minGsm: 50,
-      maxGsm: 120,
-      supportedHandles: ['FLAT HANDLE', 'TWISTED HANDLE'],
-      capacity: 15000,
-      available: true,
-      nextAvailableTime: baseTime
-    },
-    {
-      id: 'MACHINE_02', 
-      name: 'Standard Paper Bag Machine #2',
-      maxWidth: 400,
-      maxHeight: 500,
-      maxGusset: 180,
-      minGsm: 40,
-      maxGsm: 100,
-      supportedHandles: ['FLAT HANDLE'],
-      capacity: 12000,
-      available: true,
-      nextAvailableTime: baseTime
-    },
-    {
-      id: 'MACHINE_03',
-      name: 'Premium Handle Machine #3',
-      maxWidth: 350,
-      maxHeight: 450,
-      maxGusset: 160,
-      minGsm: 70,
-      maxGsm: 120,
-      supportedHandles: ['TWISTED HANDLE'],
-      capacity: 8000,
-      available: true,
-      nextAvailableTime: baseTime
-    }
-  ];
+  return getMachineFleet();
 }
 
 function checkInventoryWithRunningTotal(bom: any[], runningInventory: Map<string, number>): {feasible: boolean, insufficientMaterials: string[], consumedMaterials: any[]} {
@@ -1263,33 +1219,96 @@ function calculateMachineScore(machine: MachineSpec, specs: any, bagQuantity: nu
 }
 
 function findAvailableMachine(specs: any, machines: MachineSpec[], deliveryDays: number = 14, bagQuantity: number = 1000): {machine: MachineSpec | null, scheduledEndTime: Date | null} {
+  // Enhanced compatibility checking with paper width consideration (rollWidth)
   const compatibleMachines = machines.filter(machine => {
-    return specs.width <= machine.maxWidth &&
-           specs.height <= machine.maxHeight &&
-           specs.gusset <= machine.maxGusset &&
-           specs.gsm >= machine.minGsm &&
-           specs.gsm <= machine.maxGsm &&
-           machine.supportedHandles.includes(specs.handleType || 'FLAT HANDLE');
+    const dimensionCheck = specs.width <= machine.maxWidth &&
+                          specs.height <= machine.maxHeight &&
+                          specs.gusset <= machine.maxGusset;
+    
+    const gsmCheck = specs.gsm >= machine.minGsm && specs.gsm <= machine.maxGsm;
+    
+    const handleCheck = machine.supportedHandles.includes(specs.handleType || 'FLAT HANDLE');
+    
+    // Paper width (rollWidth) compatibility check - use machine's width constraints
+    let paperWidthCompatible = true;
+    if (specs.rollWidth) {
+      // Ensure roll width is within machine's paper width handling range
+      paperWidthCompatible = specs.rollWidth >= (machine.minWidth || 0) && 
+                           specs.rollWidth <= (machine.maxWidth || Infinity);
+    }
+    
+    return dimensionCheck && gsmCheck && handleCheck && paperWidthCompatible;
   });
   
   if (compatibleMachines.length === 0) {
+    console.log(`⚠️ No compatible machines found for specs: ${specs.width}×${specs.gusset}×${specs.height}mm, GSM:${specs.gsm}, Handle:${specs.handleType}, RollWidth:${specs.rollWidth}mm`);
     return { machine: null, scheduledEndTime: null };
   }
   
-  const machineScores = compatibleMachines.map(machine => ({
-    machine,
-    score: calculateMachineScore(machine, specs, bagQuantity, deliveryDays, machines)
-  }));
+  // Enhanced scoring with paper width efficiency and capacity optimization
+  const machineScores = compatibleMachines.map(machine => {
+    let baseScore = calculateMachineScore(machine, specs, bagQuantity, deliveryDays, machines);
+    
+    // Paper width efficiency bonus - prefer machines with optimal width range
+    if (specs.rollWidth && machine.minWidth && machine.maxWidth) {
+      const widthRange = machine.maxWidth - machine.minWidth;
+      const optimalWidth = machine.minWidth + (widthRange * 0.6); // Sweet spot at 60% of range
+      const widthDeviation = Math.abs(specs.rollWidth - optimalWidth);
+      const widthEfficiencyBonus = Math.max(0, 8 - (widthDeviation / widthRange) * 8);
+      baseScore += widthEfficiencyBonus;
+    }
+    
+    // Capacity utilization optimization - prefer efficient machine loading
+    const utilizationRatio = bagQuantity / machine.capacity;
+    if (utilizationRatio >= 0.6 && utilizationRatio <= 1.0) {
+      baseScore += 15; // Optimal utilization bonus
+    } else if (utilizationRatio >= 0.3 && utilizationRatio < 0.6) {
+      baseScore += 10; // Good utilization bonus  
+    } else if (utilizationRatio > 1.0 && utilizationRatio <= 1.5) {
+      baseScore += 5; // Acceptable over-capacity bonus
+    }
+    
+    // Handle type specialization bonus
+    if (specs.handleType === 'TWISTED HANDLE' && machine.name.includes('TWISTED')) {
+      baseScore += 12;
+    } else if (specs.handleType === 'FLAT HANDLE' && machine.name.includes('FLAT')) {
+      baseScore += 8;
+    }
+    
+    // Large order efficiency bonus for high-capacity machines
+    if (bagQuantity > 75000 && machine.capacity > 12000) {
+      baseScore += 10;
+    }
+    
+    return { machine, score: baseScore };
+  });
   
   const viableMachines = machineScores.filter(item => item.score > 0);
   
   if (viableMachines.length === 0) {
+    console.log('⚠️ No viable machines found after enhanced scoring');
+    // Return the best compatible machine even with low score as fallback
+    const fallbackMachine = compatibleMachines.sort((a, b) => a.nextAvailableTime.getTime() - b.nextAvailableTime.getTime())[0];
+    console.log(`🔄 Fallback: Using earliest available compatible machine: ${fallbackMachine?.name}`);
+    if (fallbackMachine) {
+      const productionHours = Math.ceil(bagQuantity / fallbackMachine.capacity);
+      const scheduledEndTime = new Date(fallbackMachine.nextAvailableTime.getTime() + productionHours * 60 * 60 * 1000);
+      return { machine: fallbackMachine, scheduledEndTime };
+    }
     return { machine: null, scheduledEndTime: null };
   }
   
-  viableMachines.sort((a, b) => b.score - a.score);
+  // Sort by score (highest first) and use earliest availability as tiebreaker
+  viableMachines.sort((a, b) => {
+    const scoreDiff = b.score - a.score;
+    if (Math.abs(scoreDiff) < 2) { // Close scores - use availability as tiebreaker
+      return a.machine.nextAvailableTime.getTime() - b.machine.nextAvailableTime.getTime();
+    }
+    return scoreDiff;
+  });
   
   const selectedMachine = viableMachines[0].machine;
+  console.log(`✅ Optimized machine selection: ${selectedMachine.name} (Score: ${viableMachines[0].score.toFixed(1)}, RollWidth: ${specs.rollWidth || 'N/A'}mm)`);
   
   const productionHours = Math.ceil(bagQuantity / selectedMachine.capacity);
   const scheduledEndTime = new Date(selectedMachine.nextAvailableTime.getTime() + productionHours * 60 * 60 * 1000);
@@ -1298,10 +1317,19 @@ function findAvailableMachine(specs: any, machines: MachineSpec[], deliveryDays:
 }
 
 function scheduleProductionOnMachine(machine: MachineSpec, bagQuantity: number, orderId: string): MachineSchedule {
-  const productionHours = Math.ceil(bagQuantity / machine.capacity);
-  const startTime = new Date(machine.nextAvailableTime);
-  const endTime = new Date(startTime.getTime() + productionHours * 60 * 60 * 1000);
+  // Calculate production time including setup time and efficiency
+  const setupHours = machine.setupTimeMinutes / 60;
+  const baseProductionHours = bagQuantity / machine.hourlyCapacity;
+  const adjustedProductionHours = baseProductionHours / machine.efficiency;
+  const totalHours = setupHours + adjustedProductionHours;
   
+  const startTime = new Date(machine.nextAvailableTime);
+  const endTime = new Date(startTime.getTime() + totalHours * 60 * 60 * 1000);
+  
+  // Update machine scheduling metrics
+  machine.scheduledBags += bagQuantity;
+  machine.scheduledHours += totalHours;
+  machine.remainingDailyCapacity = Math.max(0, machine.capacity - machine.scheduledBags);
   machine.nextAvailableTime = endTime;
   
   return {
@@ -1309,7 +1337,10 @@ function scheduleProductionOnMachine(machine: MachineSpec, bagQuantity: number, 
     orderId,
     startTime,
     endTime,
-    bagQuantity
+    bagQuantity,
+    setupTimeMinutes: machine.setupTimeMinutes,
+    productionHours: adjustedProductionHours,
+    totalHours
   };
 }
 
@@ -1329,9 +1360,7 @@ async function processOrdersWithSequentialInventory(orders: any[]): Promise<{res
     try {
       const orderAnalysis = await calculateOrderAnalysisWithoutInventoryCheck(order);
       const inventoryCheck = checkInventoryWithRunningTotal(orderAnalysis.bom, runningInventory);
-      const machineCheck = inventoryCheck.feasible 
-        ? findAvailableMachine(orderAnalysis.specs, machineFleet, order.deliveryDays || 14, orderAnalysis.actualBags)
-        : { machine: null, scheduledEndTime: null };
+      const machineCheck = findAvailableMachine(orderAnalysis.specs, machineFleet, order.deliveryDays || 14, orderAnalysis.actualBags);
       
       const isFeasible = inventoryCheck.feasible && machineCheck.machine !== null;
       
@@ -1345,6 +1374,8 @@ async function processOrdersWithSequentialInventory(orders: any[]): Promise<{res
         insufficientMaterials: inventoryCheck.insufficientMaterials,
         assignedMachine: machineCheck.machine?.name || null,
         machineId: machineCheck.machine?.id || null,
+        machineCapacity: machineCheck.machine?.capacity || null,
+        machineDescription: machineCheck.machine?.name || null,
         productionSchedule: null as MachineSchedule | null,
         consumedMaterials: inventoryCheck.consumedMaterials
       };
@@ -1388,6 +1419,11 @@ async function processOrdersWithSequentialInventory(orders: any[]): Promise<{res
     remaining
   }));
   
+  // Calculate comprehensive machine analytics
+  const machineAnalytics = calculateMachineAnalytics(machineFleet, productionSchedule);
+  const productionTimeline = generateProductionTimeline(machineFleet, productionSchedule);
+  const bottleneckAnalysis = analyzeProductionBottlenecks(machineFleet, productionSchedule);
+  
   const summary = {
     totalOrders: orders.length,
     feasibleOrders: feasibleOrdersCount,
@@ -1398,8 +1434,25 @@ async function processOrdersWithSequentialInventory(orders: any[]): Promise<{res
       machineId: machine.id,
       machineName: machine.name,
       nextAvailable: machine.nextAvailableTime,
-      scheduledOrders: productionSchedule.filter(s => s.machineId === machine.id).length
-    }))
+      scheduledOrders: productionSchedule.filter(s => s.machineId === machine.id).length,
+      scheduledBags: machine.scheduledBags,
+      scheduledHours: machine.scheduledHours,
+      remainingDailyCapacity: machine.remainingDailyCapacity,
+      utilizationPercentage: ((machine.scheduledHours / machine.workingHoursPerDay) * 100).toFixed(1) + '%',
+      dailyCapacity: machine.capacity,
+      hourlyCapacity: machine.hourlyCapacity,
+      efficiency: machine.efficiency,
+      operatorCostPerHour: machine.operatorCostPerHour,
+      energyCostPerHour: machine.energyCostPerHour,
+      setupTimeMinutes: machine.setupTimeMinutes
+    })),
+    machineAnalytics,
+    productionTimeline,
+    bottleneckAnalysis,
+    // Summary statistics
+    totalBagsScheduled: machineFleet.reduce((sum, machine) => sum + machine.scheduledBags, 0),
+    totalProductionHours: machineFleet.reduce((sum, machine) => sum + machine.scheduledHours, 0),
+    averageUtilization: ((machineFleet.reduce((sum, machine) => sum + (machine.scheduledHours / machine.workingHoursPerDay), 0) / machineFleet.length) * 100).toFixed(1) + '%'
   };
   
   return { results, summary };

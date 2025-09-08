@@ -15,9 +15,15 @@ interface BulkOrderResult {
   orderQty: number;
   orderUnit: string;
   actualBags?: number;
-  totalCost?: number;
+  // totalCost?: number;
   feasible: boolean;
   error?: string;
+  assignedMachine?: string;
+  machineId?: string;
+  machineCapacity?: number;
+  machineDescription?: string;
+  machineFeasible?: boolean;
+  originalSAPCode?: string;
 }
 
 interface BulkUploadResponse {
@@ -26,7 +32,7 @@ interface BulkUploadResponse {
   summary: {
     totalOrders: number;
     feasibleOrders: number;
-    totalCost: number;
+    // totalCost: number;
   };
   orders: BulkOrderResult[];
 }
@@ -199,7 +205,7 @@ export default function BulkUpload() {
                     </p>
                   </div>
                   
-                  <div className="text-center">
+                  {/* <div className="text-center">
                     <div className="text-3xl font-bold text-green-900 mb-2">
                       €{results.summary.totalCost.toFixed(2)}
                     </div>
@@ -207,7 +213,7 @@ export default function BulkUpload() {
                     <p className="text-sm text-muted-foreground">
                       Estimated material cost
                     </p>
-                  </div>
+                  </div> */}
                 </div>
 
                 <div className="mt-6">
@@ -239,9 +245,12 @@ export default function BulkUpload() {
                     <thead>
                       <tr className="bg-gradient-to-r from-slate-50 to-slate-100 border-b">
                         <th className="text-left px-4 py-3 font-semibold">Bag Name</th>
+                        <th className="text-left px-4 py-3 font-semibold">SAP Code</th>
                         <th className="text-left px-4 py-3 font-semibold">SKU</th>
                         <th className="text-right px-4 py-3 font-semibold">Quantity</th>
                         <th className="text-right px-4 py-3 font-semibold">Bags</th>
+                        <th className="text-left px-4 py-3 font-semibold">Machine</th>
+                        <th className="text-right px-4 py-3 font-semibold">Capacity</th>
                         <th className="text-center px-4 py-3 font-semibold">Status</th>
                       </tr>
                     </thead>
@@ -249,6 +258,9 @@ export default function BulkUpload() {
                       {results.orders.map((order, index) => (
                         <tr key={index} className="border-b hover:bg-slate-50 transition-colors">
                           <td className="px-4 py-3 font-medium">{order.bagName}</td>
+                          <td className="px-4 py-3 text-sm font-mono">
+                            {order.originalSAPCode || order.sku || '-'}
+                          </td>
                           <td className="px-4 py-3 text-sm text-muted-foreground">
                             {order.sku || 'Custom'}
                           </td>
@@ -257,6 +269,12 @@ export default function BulkUpload() {
                           </td>
                           <td className="px-4 py-3 text-right font-mono font-bold">
                             {order.actualBags?.toLocaleString() || order.orderQty.toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            {order.machineDescription || order.assignedMachine || '-'}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono">
+                            {order.machineCapacity?.toLocaleString() || '-'}
                           </td>
                           <td className="px-4 py-3 text-center">
                             <Badge 
