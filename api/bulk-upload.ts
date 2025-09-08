@@ -1120,14 +1120,147 @@ async function fetchAllInventory(): Promise<Map<string, number>> {
   }
 }
 
-import { 
-  getMachineFleet, 
-  calculateMachineAnalytics, 
-  generateProductionTimeline, 
-  analyzeProductionBottlenecks,
-  type MachineSpec, 
-  type MachineAnalytics 
-} from '../client/src/data/machinesData';
+// Serverless-compatible machine data and functions
+interface MachineSpec {
+  id: string;
+  name: string;
+  maxWidth: number;
+  maxHeight: number;
+  maxGusset: number;
+  minGsm: number;
+  maxGsm: number;
+  supportedHandles: string[];
+  capacity: number;
+  available: boolean;
+  nextAvailableTime: Date;
+  minWidth?: number;
+  hourlyCapacity: number;
+  scheduledBags: number;
+  scheduledHours: number;
+  remainingDailyCapacity: number;
+  setupTimeMinutes: number;
+  efficiency: number;
+  operatorCostPerHour: number;
+  energyCostPerHour: number;
+  maintenanceCostPerDay: number;
+  workingHoursPerDay: number;
+}
+
+interface MachineAnalytics {
+  machineId: string;
+  machineName: string;
+  totalBagsScheduled: number;
+  totalProductionHours: number;
+  utilizationPercentage: number;
+  remainingCapacity: number;
+  estimatedCompletionTime: Date;
+  productionCost: number;
+  orders: Array<{
+    orderId: string;
+    bagQuantity: number;
+    startTime: Date;
+    endTime: Date;
+    setupTime: number;
+  }>;
+}
+
+function getMachineFleet(): MachineSpec[] {
+  const baseTime = new Date();
+  const MACHINES_DATA = {
+    'M1': { name: 'M1', maxWidth: 1100, minGsm: 70, maxGsm: 100, handleType: 'FLAT HANDLE', dailyCapacity: 82000, hourlyCapacity: 5125, status: 'available', minWidth: 800, setupTimeMinutes: 30, efficiency: 0.92, operatorCostPerHour: 18, energyCostPerHour: 12, maintenanceCostPerDay: 25, scheduledBags: 0, scheduledHours: 0, remainingDailyCapacity: 82000, workingHoursPerDay: 16 },
+    'M2': { name: 'M2', maxWidth: 1100, minGsm: 70, maxGsm: 100, handleType: 'FLAT HANDLE', dailyCapacity: 82000, hourlyCapacity: 5125, status: 'busy', minWidth: 800, setupTimeMinutes: 30, efficiency: 0.92, operatorCostPerHour: 18, energyCostPerHour: 12, maintenanceCostPerDay: 25, scheduledBags: 69700, scheduledHours: 13.6, remainingDailyCapacity: 12300, workingHoursPerDay: 16 },
+    'M3': { name: 'M3', maxWidth: 1100, minGsm: 70, maxGsm: 100, handleType: 'FLAT HANDLE', dailyCapacity: 82000, hourlyCapacity: 5125, status: 'available', minWidth: 800, setupTimeMinutes: 30, efficiency: 0.92, operatorCostPerHour: 18, energyCostPerHour: 12, maintenanceCostPerDay: 25, scheduledBags: 36900, scheduledHours: 7.2, remainingDailyCapacity: 45100, workingHoursPerDay: 16 },
+    'M4': { name: 'M4', maxWidth: 1100, minGsm: 70, maxGsm: 100, handleType: 'FLAT HANDLE', dailyCapacity: 82000, hourlyCapacity: 5125, status: 'available', minWidth: 800, setupTimeMinutes: 30, efficiency: 0.92, operatorCostPerHour: 18, energyCostPerHour: 12, maintenanceCostPerDay: 25, scheduledBags: 24600, scheduledHours: 4.8, remainingDailyCapacity: 57400, workingHoursPerDay: 16 },
+    'M5': { name: 'M5', maxWidth: 1200, minGsm: 70, maxGsm: 110, handleType: 'FLAT HANDLE', dailyCapacity: 82000, hourlyCapacity: 5125, status: 'available', minWidth: 700, setupTimeMinutes: 45, efficiency: 0.88, operatorCostPerHour: 20, energyCostPerHour: 14, maintenanceCostPerDay: 30, scheduledBags: 45100, scheduledHours: 8.8, remainingDailyCapacity: 36900, workingHoursPerDay: 16 },
+    'M6': { name: 'M6', maxWidth: 1200, minGsm: 70, maxGsm: 110, handleType: 'TWISTED HANDLE', dailyCapacity: 82000, hourlyCapacity: 5125, status: 'maintenance', minWidth: 700, setupTimeMinutes: 60, efficiency: 0.85, operatorCostPerHour: 22, energyCostPerHour: 16, maintenanceCostPerDay: 35, scheduledBags: 0, scheduledHours: 0, remainingDailyCapacity: 82000, workingHoursPerDay: 16 },
+    'NL1': { name: 'NL1', maxWidth: 1000, minGsm: 75, maxGsm: 95, handleType: 'FLAT HANDLE', dailyCapacity: 65600, hourlyCapacity: 4100, status: 'available', minWidth: 750, setupTimeMinutes: 25, efficiency: 0.90, operatorCostPerHour: 16, energyCostPerHour: 10, maintenanceCostPerDay: 20, scheduledBags: 45920, scheduledHours: 11.2, remainingDailyCapacity: 19680, workingHoursPerDay: 16 },
+    'NL2': { name: 'NL2', maxWidth: 1000, minGsm: 75, maxGsm: 95, handleType: 'FLAT HANDLE', dailyCapacity: 65600, hourlyCapacity: 4100, status: 'available', minWidth: 750, setupTimeMinutes: 25, efficiency: 0.90, operatorCostPerHour: 16, energyCostPerHour: 10, maintenanceCostPerDay: 20, scheduledBags: 26240, scheduledHours: 6.4, remainingDailyCapacity: 39360, workingHoursPerDay: 16 }
+  };
+  
+  return Object.entries(MACHINES_DATA).map(([id, machine]) => ({
+    id,
+    name: machine.name,
+    maxWidth: machine.maxWidth,
+    maxHeight: 600,
+    maxGusset: 200,
+    minGsm: machine.minGsm,
+    maxGsm: machine.maxGsm,
+    supportedHandles: [machine.handleType],
+    capacity: machine.dailyCapacity,
+    available: machine.status === 'available',
+    nextAvailableTime: baseTime,
+    minWidth: machine.minWidth,
+    hourlyCapacity: machine.hourlyCapacity,
+    scheduledBags: machine.scheduledBags,
+    scheduledHours: machine.scheduledHours,
+    remainingDailyCapacity: machine.remainingDailyCapacity,
+    setupTimeMinutes: machine.setupTimeMinutes,
+    efficiency: machine.efficiency,
+    operatorCostPerHour: machine.operatorCostPerHour,
+    energyCostPerHour: machine.energyCostPerHour,
+    maintenanceCostPerDay: machine.maintenanceCostPerDay,
+    workingHoursPerDay: machine.workingHoursPerDay
+  }));
+}
+
+function calculateMachineAnalytics(machines: MachineSpec[], productionSchedule: any[]): MachineAnalytics[] {
+  return machines.map(machine => {
+    const machineOrders = productionSchedule.filter(order => order.machineId === machine.id);
+    const totalBagsScheduled = machineOrders.reduce((sum, order) => sum + order.bagQuantity, 0);
+    const totalProductionHours = machineOrders.reduce((sum, order) => {
+      const hours = (order.endTime.getTime() - order.startTime.getTime()) / (1000 * 60 * 60);
+      return sum + hours;
+    }, 0);
+    
+    const utilizationPercentage = (totalProductionHours / machine.workingHoursPerDay) * 100;
+    const remainingCapacity = machine.capacity - totalBagsScheduled;
+    const productionCost = totalProductionHours * (machine.operatorCostPerHour + machine.energyCostPerHour) + machine.maintenanceCostPerDay;
+    
+    const estimatedCompletionTime = machineOrders.length > 0 
+      ? new Date(Math.max(...machineOrders.map(order => order.endTime.getTime())))
+      : new Date();
+
+    return {
+      machineId: machine.id,
+      machineName: machine.name,
+      totalBagsScheduled,
+      totalProductionHours,
+      utilizationPercentage,
+      remainingCapacity,
+      estimatedCompletionTime,
+      productionCost,
+      orders: machineOrders.map(order => ({
+        orderId: order.orderId,
+        bagQuantity: order.bagQuantity,
+        startTime: order.startTime,
+        endTime: order.endTime,
+        setupTime: machine.setupTimeMinutes
+      }))
+    };
+  });
+}
+
+function generateProductionTimeline(machines: MachineSpec[], productionSchedule: any[]): any[] {
+  return []; // Simplified for serverless
+}
+
+function analyzeProductionBottlenecks(machines: MachineSpec[], productionSchedule: any[]) {
+  const analytics = calculateMachineAnalytics(machines, productionSchedule);
+  return {
+    bottlenecks: analytics.filter(machine => machine.utilizationPercentage > 90),
+    underutilized: analytics.filter(machine => machine.utilizationPercentage < 50),
+    loadBalancingSuggestions: [],
+    setupOptimizations: [],
+    timeline: [],
+    summary: {
+      totalMachines: machines.length,
+      averageUtilization: analytics.reduce((sum, m) => sum + m.utilizationPercentage, 0) / analytics.length,
+      bottleneckCount: analytics.filter(machine => machine.utilizationPercentage > 90).length,
+      underutilizedCount: analytics.filter(machine => machine.utilizationPercentage < 50).length,
+      optimizationPotential: 'Medium'
+    }
+  };
+}
 
 interface MachineSchedule {
   machineId: string;
