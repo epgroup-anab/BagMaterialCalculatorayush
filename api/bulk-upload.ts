@@ -1372,6 +1372,7 @@ async function processOrdersWithSequentialInventory(orders: any[]): Promise<{res
         machineFeasible: machineCheck.machine !== null,
         feasible: isFeasible,
         insufficientMaterials: inventoryCheck.insufficientMaterials,
+        // Machine assignment should happen regardless of inventory feasibility
         assignedMachine: machineCheck.machine?.name || null,
         machineId: machineCheck.machine?.id || null,
         machineCapacity: machineCheck.machine?.capacity || null,
@@ -1380,20 +1381,22 @@ async function processOrdersWithSequentialInventory(orders: any[]): Promise<{res
         consumedMaterials: inventoryCheck.consumedMaterials
       };
       
+      // Always schedule production if machine is available, regardless of inventory
+      if (machineCheck.machine) {
+        const schedule = scheduleProductionOnMachine(
+          machineCheck.machine, 
+          orderAnalysis.actualBags, 
+          `ORDER_${orderIndex}`
+        );
+        orderResult.productionSchedule = schedule;
+        productionSchedule.push(schedule);
+      }
+      
+      // Only consume inventory and count as feasible if both inventory and machine are available
       if (isFeasible) {
         for (const consumption of inventoryCheck.consumedMaterials) {
           const currentStock = runningInventory.get(consumption.sapCode) || 0;
           runningInventory.set(consumption.sapCode, currentStock - consumption.consumed);
-        }
-        
-        if (machineCheck.machine) {
-          const schedule = scheduleProductionOnMachine(
-            machineCheck.machine, 
-            orderAnalysis.actualBags, 
-            `ORDER_${orderIndex}`
-          );
-          orderResult.productionSchedule = schedule;
-          productionSchedule.push(schedule);
         }
         
         totalProcessedCost += orderAnalysis.totalCost;
@@ -1409,7 +1412,12 @@ async function processOrdersWithSequentialInventory(orders: any[]): Promise<{res
         error: error instanceof Error ? error.message : 'Unknown error',
         feasible: false,
         inventoryFeasible: false,
-        machineFeasible: false
+        machineFeasible: false,
+        assignedMachine: null,
+        machineId: null,
+        machineCapacity: null,
+        machineDescription: null,
+        productionSchedule: null
       });
     }
   }
