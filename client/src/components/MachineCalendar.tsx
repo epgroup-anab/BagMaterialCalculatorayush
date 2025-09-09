@@ -46,27 +46,6 @@ const MachineCalendar: React.FC = () => {
     }
   };
 
-  // Parse CSV properly handling quoted values
-  const parseCSVLine = (line: string): string[] => {
-    const result = [];
-    let current = '';
-    let inQuotes = false;
-    
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      
-      if (char === '"') {
-        inQuotes = !inQuotes;
-      } else if (char === ',' && !inQuotes) {
-        result.push(current.trim());
-        current = '';
-      } else {
-        current += char;
-      }
-    }
-    result.push(current.trim());
-    return result;
-  };
 
   // Parse date string from CSV format "01, Saturday, Feb 2025" to proper date
   const parseCsvDate = (dateStr: string): Date | null => {
@@ -107,41 +86,45 @@ const MachineCalendar: React.FC = () => {
     return sku ? sku.name : sapCode;
   };
 
-  // Fetch and parse CSV data
+  // Fetch schedule data from API
   useEffect(() => {
     const fetchScheduleData = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/machine_timeplan.csv');
-        const csvText = await response.text();
+        const response = await fetch('/api/schedule-csv');
         
-        const lines = csvText.split('\n').filter(line => line.trim());
-        const headers = parseCSVLine(lines[0]);
-        
-        const parsed: MachineScheduleData[] = [];
-        
-        for (let i = 1; i < lines.length; i++) {
-          const values = parseCSVLine(lines[i]);
-          
-          if (values.length >= 3) {
-            const dateStr = values[0];
-            const shift = values[1];
-            
-            const machines: { [key: string]: string } = {};
-            for (let j = 2; j < Math.min(values.length - 1, headers.length - 1); j++) {
-              const machineKey = headers[j];
-              machines[machineKey] = values[j] || 'NO PLANNING';
-            }
-            
-            parsed.push({
-              date: dateStr,
-              shift,
-              machines
-            });
-          }
+        if (!response.ok) {
+          throw new Error(`Failed to fetch schedule data: ${response.status}`);
         }
         
-        console.log('Parsed schedule data:', parsed.slice(0, 5)); // Debug log
+        const apiData = await response.json();
+        
+        if (!apiData.success || !apiData.data) {
+          throw new Error('Invalid API response format');
+        }
+        
+        // Transform API data to component format
+        const parsed: MachineScheduleData[] = [];
+        
+        Object.entries(apiData.data).forEach(([dateKey, dayData]: [string, any]) => {
+          Object.entries(dayData.shifts).forEach(([shift, machines]: [string, any]) => {
+            const machineAssignments: { [key: string]: string } = {};
+            
+            Object.entries(machines).forEach(([machineId, machineData]: [string, any]) => {
+              // Convert machine IDs back to CSV format for compatibility
+              const csvMachineKey = `MC ${machineId}`;
+              machineAssignments[csvMachineKey] = (machineData as any).productCode || 'NO PLANNING';
+            });
+            
+            parsed.push({
+              date: dayData.dateString, // Use the formatted date string from API
+              shift,
+              machines: machineAssignments
+            });
+          });
+        });
+        
+        console.log('Parsed schedule data from API:', parsed.slice(0, 5)); // Debug log
         setScheduleData(parsed);
       } catch (error) {
         console.error('Error fetching schedule data:', error);
@@ -181,7 +164,17 @@ const MachineCalendar: React.FC = () => {
     const daySchedule: DaySchedule = {};
     
     const relevantSchedules = scheduleData.filter(item => {
-      const scheduleDate = parseCsvDate(item.date);
+      // Try parsing the date string - it might be already formatted from API
+      let scheduleDate: Date | null = null;
+      
+      if (item.date.includes(',')) {
+        // CSV format: "03, Monday, Feb 2025"
+        scheduleDate = parseCsvDate(item.date);
+      } else {
+        // Already formatted date string from API
+        scheduleDate = new Date(item.date);
+      }
+      
       return scheduleDate && scheduleDate.toDateString() === date.toDateString();
     });
     
