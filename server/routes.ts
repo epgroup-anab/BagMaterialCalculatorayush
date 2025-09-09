@@ -6,6 +6,8 @@ import { parse } from "csv-parse";
 import * as XLSX from "xlsx";
 import puppeteer from "puppeteer";
 import { z } from "zod";
+import fs from "fs";
+import path from "path";
 import { SKU_DATA } from "../client/src/data/skuData.ts";
 import { 
   getMachineFleet, 

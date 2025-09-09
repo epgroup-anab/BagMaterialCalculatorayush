@@ -189,17 +189,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Find and read CSV file
-    const possiblePaths = [
-      path.join(process.cwd(), 'machine_timeplan.csv'),
-      path.join(__dirname, '..', 'machine_timeplan.csv'),
-      path.join(__dirname, '..', '..', 'machine_timeplan.csv')
-    ];
-    
+    // In Vercel, try multiple strategies to find the CSV file
     let csvContent = '';
     let csvPath = '';
     
-    for (const possiblePath of possiblePaths) {
+    // Strategy 1: Try common Vercel paths
+    const vercelPaths = [
+      // Vercel's typical build paths
+      '/var/task/machine_timeplan.csv',
+      path.join(process.cwd(), 'machine_timeplan.csv'),
+      path.join(process.cwd(), '..', 'machine_timeplan.csv'),
+      path.join(__dirname, 'machine_timeplan.csv'),
+      path.join(__dirname, '..', 'machine_timeplan.csv'),
+      path.join(__dirname, '..', '..', 'machine_timeplan.csv'),
+    ];
+    
+    console.log('🔍 Environment:', process.env.VERCEL ? 'Vercel' : 'Local');
+    console.log('🔍 Process CWD:', process.cwd());
+    console.log('🔍 __dirname:', __dirname);
+    
+    for (const possiblePath of vercelPaths) {
       try {
         if (fs.existsSync(possiblePath)) {
           csvContent = fs.readFileSync(possiblePath, 'utf-8');
@@ -208,12 +217,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           break;
         }
       } catch (err) {
+        // Continue silently to next path
         continue;
       }
     }
     
+    // Strategy 2: If not found, try to read from current directory listing
     if (!csvContent) {
-      throw new Error('CSV file not found');
+      try {
+        const currentDirFiles = fs.readdirSync(process.cwd());
+        console.log('📁 Files in current directory:', currentDirFiles);
+        
+        // Look for any CSV file that might be the machine timeplan
+        const csvFiles = currentDirFiles.filter(f => f.includes('machine') && f.endsWith('.csv'));
+        if (csvFiles.length > 0) {
+          const foundCsvPath = path.join(process.cwd(), csvFiles[0]);
+          csvContent = fs.readFileSync(foundCsvPath, 'utf-8');
+          csvPath = foundCsvPath;
+          console.log(`✅ Found CSV by search: ${csvPath}`);
+        }
+      } catch (err) {
+        console.log('❌ Directory search failed:', err);
+      }
+    }
+    
+    if (!csvContent) {
+      throw new Error(`CSV file not found. Searched paths: ${vercelPaths.join(', ')}`);
     }
     
     console.log(`📊 CSV file size: ${csvContent.length} characters`);
@@ -241,9 +270,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   } catch (error) {
     console.error('❌ Schedule API error:', error);
+    
+    // Only include debug info in development
+    const isDevelopment = !process.env.VERCEL;
+    
     return res.status(500).json({ 
-      error: 'Failed to parse schedule data',
-      message: error instanceof Error ? error.message : 'Unknown error'
+      error: 'Failed to load schedule data',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      ...(isDevelopment && {
+        debug: {
+          stack: error instanceof Error ? error.stack : 'No stack trace',
+          cwd: process.cwd(),
+          dirname: __dirname,
+          env: process.env.NODE_ENV
+        }
+      })
     });
   }
 }
