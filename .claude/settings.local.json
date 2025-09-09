@@ -8,7 +8,9 @@
       "Bash(del test-sequential-orders.csv)",
       "Bash(rm:*)",
       "Bash(git log:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)"
     ],
     "deny": []
   }

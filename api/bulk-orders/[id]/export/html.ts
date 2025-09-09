@@ -15,7 +15,7 @@ const BulkOrderSchema = new Schema<IBulkOrder>({
   fileName: { type: String, required: true },
   totalOrders: { type: Number, required: true },
   totalCost: { type: Number, required: true },
-  orders: { type: [Schema.Types.Mixed], required: true },
+  orders: { type: [], required: true },
   feasible: { type: Number, required: true },
   uploadedAt: { type: Date, default: Date.now }
 });
