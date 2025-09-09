@@ -18,6 +18,10 @@
       "dest": "/api/bulk-upload.ts"
     },
     {
+      "src": "/api/schedule-csv",
+      "dest": "/api/schedule-csv.ts"
+    },
+    {
       "src": "/api/bulk-orders/([^/]+)/export/html",
       "dest": "/api/bulk-orders/[id]/export/html.ts?id=$1"
     },

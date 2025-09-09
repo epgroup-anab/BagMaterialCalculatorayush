@@ -128,6 +128,8 @@ const MachineCalendar: React.FC = () => {
         setScheduleData(parsed);
       } catch (error) {
         console.error('Error fetching schedule data:', error);
+        // Show user-friendly error message
+        alert('Unable to load schedule data. Please try refreshing the page or contact support.');
       } finally {
         setLoading(false);
       }
