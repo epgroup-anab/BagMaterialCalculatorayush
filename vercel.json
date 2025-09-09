@@ -12,6 +12,11 @@
       }
     }
   ],
+  "functions": {
+    "api/schedule-csv.ts": {
+      "includeFiles": "machine_timeplan.csv"
+    }
+  },
   "routes": [
     {
       "src": "/api/bulk-upload",
